@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=EyeEar Audiobook
+Comment=Convert PDF/EPUB/TXT to audiobooks using Google Cloud TTS
+Exec=/mnt/ssd128/omarslab_1/2025projects/eyeear/eyeear-audiobook/eyeear.sh
+Icon=/mnt/ssd128/omarslab_1/2025projects/eyeear/eyeear-audiobook/assets/icon.png
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Utility;
+StartupNotify=true
+StartupWMClass=eyeear-audiobook
+

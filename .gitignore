@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+temp/
+output/
+data/
+*.log
+.env
+.DS_Store
+*.mp3
+*.wav
+*.pdf
+*.epub
+*.metadata.json
+.vscode/
+.idea/

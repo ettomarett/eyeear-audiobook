@@ -1,0 +1,128 @@
+{
+  "name": "eyeear-audiobook",
+  "version": "1.0.0",
+  "description": "Audiobook generator from PDF/EPUB using Google Cloud TTS",
+  "main": "electron/main.js",
+  "author": "EyeEar Team",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:react\" \"npm run dev:backend\"",
+    "dev:all": "concurrently \"npm run dev:react\" \"npm run dev:electron\" \"npm run dev:backend\"",
+    "dev:react": "vite",
+    "dev:electron": "wait-on tcp:5173 -t 30000 && ELECTRON_DISABLE_SANDBOX=1 START_BACKEND=false electron --no-sandbox .",
+    "dev:backend": "nodemon backend/server.js",
+    "start": "ELECTRON_DISABLE_SANDBOX=1 electron --no-sandbox .",
+    "start:standalone": "ELECTRON_DISABLE_SANDBOX=1 electron --no-sandbox .",
+    "build": "npm run build:react && npm run build:electron",
+    "build:react": "vite build",
+    "build:electron": "electron-builder --linux",
+    "build:win": "npm run build:react && electron-builder --win",
+    "build:mac": "npm run build:react && electron-builder --mac",
+    "build:all": "npm run build:react && electron-builder --linux --win --mac",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": [
+    "audiobook",
+    "tts",
+    "electron",
+    "react",
+    "google-cloud",
+    "text-to-speech"
+  ],
+  "build": {
+    "appId": "com.eyeear.audiobook",
+    "productName": "EyeEar Audiobook Generator",
+    "copyright": "Copyright © 2025 EyeEar",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "backend/**/*",
+      "data/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": ["**/*", "!node_modules/**"]
+      },
+      {
+        "from": "data",
+        "to": "data",
+        "filter": ["**/*"]
+      }
+    ],
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "AudioVideo",
+      "icon": "assets/icons",
+      "synopsis": "Convert PDF/EPUB books to audiobooks",
+      "description": "EyeEar Audiobook Generator converts PDF and EPUB books to high-quality audiobooks using Google Cloud Text-to-Speech."
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.utilities"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.18.0",
+    "@google-cloud/text-to-speech": "^5.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "epub": "^1.3.0",
+    "express": "^4.18.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "howler": "^2.2.4",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "pdf2pic": "^3.1.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tesseract.js": "^5.0.4",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "nodemon": "^3.0.2",
+    "vite": "^5.0.8",
+    "wait-on": "^7.2.0"
+  }
+}
