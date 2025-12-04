@@ -13,15 +13,15 @@ https://github.com/user-attachments/assets/d1d3a822-9dfa-41e9-aad2-a35190dddd40
 [⬇️ Download MP3](wavenet_voice_sample.mp3)
 ## Sneak Peek
 
-![Screenshot 1](./sneakpeek/Pasted%20image%2020251205003848.png)
-![Screenshot 2](./sneakpeek/Pasted%20image%2020251205004802.png)
-![Screenshot 3](./sneakpeek/Pasted%20image%2020251205004129.png)
-![Screenshot 4](./sneakpeek/Pasted%20image%2020251205004226.png)
-![Screenshot 5](./sneakpeek/Pasted%20image%2020251205004251.png)
-![Screenshot 6](./sneakpeek/Pasted%20image%2020251205004304.png)
-![Screenshot 7](./sneakpeek/Pasted%20image%2020251205004335.png)
-![Screenshot 8](./sneakpeek/Pasted%20image%2020251205004702.png)
-![Screenshot 9](./sneakpeek/Pasted%20image%2020251205004722.png)
+![Screenshot 1](./sneakpeek/Pasted image 20251205003848.png)
+![Screenshot 2](./sneakpeek/Pasted image 20251205004802.png)
+![Screenshot 3](./sneakpeek/Pasted image 20251205004129.png)
+![Screenshot 4](./sneakpeek/Pasted image 20251205004226.png)
+![Screenshot 5](./sneakpeek/Pasted image 20251205004251.png)
+![Screenshot 6](./sneakpeek/Pasted image 20251205004304.png)
+![Screenshot 7](./sneakpeek/Pasted image 20251205004335.png)
+![Screenshot 8](./sneakpeek/Pasted image 20251205004702.png)
+![Screenshot 9](./sneakpeek/Pasted image 20251205004722.png)
 
 
 ## ✨ Features
