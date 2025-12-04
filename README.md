@@ -8,9 +8,9 @@ Convert your PDF, EPUB, and TXT files into high-quality audiobooks using Google 
 
 Listen to a sample generated with WaveNet voice:
 
-https://github.com/user-attachments/assets/wavenet_voice_sample.mp4
+https://github.com/ettomarett/eyeear-audiobook/raw/main/wavenet_voice_sample.mp4
 
-[⬇️ Download MP3](wavenet_voice_sample.mp3)
+[⬇️ Download MP3](wavenet_voice_sample.mp3) | [🎬 Download Video](wavenet_voice_sample.mp4)
 
 ## ✨ Features
 
