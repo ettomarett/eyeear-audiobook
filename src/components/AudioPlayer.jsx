@@ -266,7 +266,12 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
         <h2 className="book-title">{bookTitle || 'Audiobook'}</h2>
         {onReset && (
           <button className="reset-btn" onClick={onReset} title="Generate Another Book">
-            ↻ New Book
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            New Book
           </button>
         )}
       </div>
@@ -280,7 +285,12 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
 
       {loadError && (
         <div className="error-state">
-          <p>⚠️ {loadError}</p>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <p>{loadError}</p>
         </div>
       )}
 
@@ -402,13 +412,20 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
                 onClick={() => setShowAddBookmark(!showAddBookmark)}
                 title="Add bookmark at current position"
               >
-                🔖 Add Bookmark
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Add Bookmark
               </button>
               <button
                 className={`bookmark-toggle-btn ${showBookmarks ? 'active' : ''}`}
                 onClick={() => setShowBookmarks(!showBookmarks)}
               >
-                📑 Bookmarks {bookmarks.length > 0 && `(${bookmarks.length})`}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                Bookmarks {bookmarks.length > 0 && `(${bookmarks.length})`}
               </button>
             </div>
 
@@ -471,7 +488,10 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
                         }}
                         title="Delete bookmark"
                       >
-                        ×
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
                       </button>
                     </div>
                   ))

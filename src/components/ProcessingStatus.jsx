@@ -383,7 +383,11 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
             ) : elapsedTime > 0 && estimatedTime > 0 ? (
               <>
                 <span className="time-info">
-                  ⏱️ {formatTime(elapsedTime)} elapsed
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '4px' }}>
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  {formatTime(elapsedTime)} elapsed
                   {estimatedTime > elapsedTime && (
                     <> · ~{formatTime(estimatedTime - elapsedTime)} remaining</>
                   )}

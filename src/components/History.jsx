@@ -188,7 +188,7 @@ function History({ onSelectBook }) {
 
   const handleDeleteFolder = async (folderId, e) => {
     e.stopPropagation();
-    if (!window.confirm('Delete this folder? Books inside will be moved to "All Books".')) {
+    if (!window.confirm('Delete this folder? Books inside will be moved to "Uncategorized".')) {
       return;
     }
 
@@ -308,13 +308,28 @@ function History({ onSelectBook }) {
   return (
     <div className="history-container">
       <div className="history-header">
-        <h2>📚 Library</h2>
+        <h2>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          Library
+        </h2>
         <div className="history-actions">
           <button onClick={() => setShowNewFolder(true)} className="new-folder-btn" title="New Folder">
-            📁+
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              <line x1="12" y1="11" x2="12" y2="17"></line>
+              <line x1="9" y1="14" x2="15" y2="14"></line>
+            </svg>
+            New Folder
           </button>
           <button onClick={loadHistory} className="refresh-btn" title="Refresh">
-            ↻
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
           </button>
           {history.length > 0 && !selectedBook && (
             <button onClick={handleClearAll} className="clear-all-btn" title="Delete All">
@@ -349,7 +364,10 @@ function History({ onSelectBook }) {
           className={`folder-item ${currentFolder === null ? 'active' : ''}`}
           onClick={() => setCurrentFolder(null)}
         >
-          <span className="folder-icon">📚</span>
+          <svg className="folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
           <span className="folder-name">Uncategorized</span>
           <span className="folder-count">{history.filter(b => !b.folderId).length}</span>
         </div>
@@ -359,7 +377,9 @@ function History({ onSelectBook }) {
             className={`folder-item ${currentFolder === folder.id ? 'active' : ''}`}
             onClick={() => setCurrentFolder(folder.id)}
           >
-            <span className="folder-icon">📁</span>
+            <svg className="folder-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
             {editingFolderId === folder.id ? (
               <input
                 type="text"
@@ -384,14 +404,20 @@ function History({ onSelectBook }) {
                 onClick={(e) => handleRenameFolderStart(folder, e)}
                 title="Rename"
               >
-                ✏️
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
               </button>
               <button 
                 className="folder-delete-btn" 
                 onClick={(e) => handleDeleteFolder(folder.id, e)}
                 title="Delete"
               >
-                ×
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
               </button>
             </div>
           </div>
@@ -404,7 +430,11 @@ function History({ onSelectBook }) {
             className="back-btn" 
             onClick={() => setSelectedBook(null)}
           >
-            ← Back to Library
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Back to Library
           </button>
           <AudioPlayer 
             audioUrl={selectedBook.audioUrl} 
@@ -474,7 +504,12 @@ function History({ onSelectBook }) {
                           onClick={(e) => e.stopPropagation()}
                           title="Move to folder"
                         >
-                          <option value="">📁 Move...</option>
+                          <option value="">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            Move...
+                          </option>
                           <option value="">Uncategorized</option>
                           {folders.map(f => (
                             <option key={f.id} value={f.id}>{f.name}</option>
@@ -486,21 +521,31 @@ function History({ onSelectBook }) {
                         onClick={(e) => handleRenameStart(book, e)}
                         title="Rename"
                       >
-                        ✏️
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
                       </button>
                       <button
                         className="download-btn"
                         onClick={(e) => handleDownload(book, e)}
                         title="Download"
                       >
-                        ⬇️
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
                       </button>
                       <button
                         className="delete-btn"
                         onClick={(e) => handleDelete(book.id, e)}
                         title="Delete"
                       >
-                        ×
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
                       </button>
                     </div>
                   </div>

@@ -190,7 +190,13 @@ function PriceEstimator() {
   return (
     <div className="price-estimator-container">
       <div className="price-estimator-header">
-        <h2>💰 Price Estimator</h2>
+        <h2>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23"></line>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+          </svg>
+          Price Estimator
+        </h2>
         <p>Calculate the estimated cost for text-to-speech conversion</p>
       </div>
 
@@ -265,7 +271,11 @@ function PriceEstimator() {
               </div>
             ) : (
               <div className="price-result-placeholder">
-                <span className="placeholder-icon">📊</span>
+                <svg className="placeholder-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10"></line>
+                  <line x1="12" y1="20" x2="12" y2="4"></line>
+                  <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
                 <span className="placeholder-text">Enter character count to see estimate</span>
               </div>
             )}
@@ -273,7 +283,16 @@ function PriceEstimator() {
         </div>
 
         <div className="pricing-reference">
-          <h3>📋 Voice Pricing Reference</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            Voice Pricing Reference
+          </h3>
           <table className="pricing-table">
             <thead>
               <tr>
@@ -319,28 +338,46 @@ function PriceEstimator() {
         </div>
 
         <div className="pricing-examples">
-          <h3>📖 Typical Book Lengths</h3>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            Typical Book Lengths
+          </h3>
           <div className="examples-grid">
             <div className="example-card">
-              <span className="example-icon">📕</span>
+              <svg className="example-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
               <span className="example-title">Short Story</span>
               <span className="example-chars">~50,000 chars</span>
               <span className="example-price">$1.50 (Chirp 3 HD)</span>
             </div>
             <div className="example-card">
-              <span className="example-icon">📗</span>
+              <svg className="example-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
               <span className="example-title">Novel</span>
               <span className="example-chars">~400,000 chars</span>
               <span className="example-price">$12.00 (Chirp 3 HD)</span>
             </div>
             <div className="example-card">
-              <span className="example-icon">📘</span>
+              <svg className="example-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
               <span className="example-title">Long Novel</span>
               <span className="example-chars">~800,000 chars</span>
               <span className="example-price">$24.00 (Chirp 3 HD)</span>
             </div>
             <div className="example-card">
-              <span className="example-icon">📙</span>
+              <svg className="example-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
               <span className="example-title">Epic</span>
               <span className="example-chars">~1,500,000 chars</span>
               <span className="example-price">$45.00 (Chirp 3 HD)</span>

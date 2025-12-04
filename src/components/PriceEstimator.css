@@ -10,13 +10,22 @@
 }
 
 .price-estimator-header h2 {
-  color: #ffc107;
+  color: #d4a574;
   font-size: 2.2rem;
   margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.price-estimator-header h2 svg {
+  stroke: currentColor;
+  fill: none;
 }
 
 .price-estimator-header p {
-  color: #adb5bd;
+  color: #c9b8a8;
   font-size: 1.1rem;
 }
 
@@ -28,8 +37,8 @@
 
 /* Calculator Card */
 .price-calculator-card {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  background: linear-gradient(135deg, rgba(139, 101, 78, 0.1) 0%, rgba(101, 67, 33, 0.05) 100%);
+  border: 1px solid rgba(139, 101, 78, 0.3);
   border-radius: 20px;
   padding: 2rem;
   display: grid;
@@ -50,7 +59,7 @@
 }
 
 .form-group label {
-  color: #e0e0e0;
+  color: #e8e0d6;
   font-size: 0.95rem;
   font-weight: 500;
 }
@@ -59,10 +68,10 @@
 .form-group select {
   width: 100%;
   padding: 0.9rem 1.2rem;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  background: rgba(101, 67, 33, 0.2);
+  border: 1px solid rgba(139, 101, 78, 0.3);
   border-radius: 10px;
-  color: #ffffff;
+  color: #e8e0d6;
   font-size: 1.1rem;
   transition: all 0.2s;
 }
@@ -70,12 +79,12 @@
 .form-group input[type="text"]:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #ffc107;
-  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.2);
+  border-color: #d4a574;
+  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.2);
 }
 
 .form-group input[type="text"]::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(232, 224, 214, 0.4);
 }
 
 .form-group select {
@@ -83,13 +92,13 @@
 }
 
 .form-group select option {
-  background: #1e1e2e;
-  color: #ffffff;
+  background: rgba(101, 67, 33, 0.95);
+  color: #e8e0d6;
 }
 
 .form-group select optgroup {
-  background: #1e1e2e;
-  color: #adb5bd;
+  background: rgba(101, 67, 33, 0.95);
+  color: #c9b8a8;
   font-weight: 600;
 }
 
@@ -103,10 +112,10 @@
 .preset-btn {
   flex: 1;
   padding: 0.5rem 1rem;
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  background: rgba(139, 101, 78, 0.15);
+  border: 1px solid rgba(139, 101, 78, 0.3);
   border-radius: 6px;
-  color: #ffc107;
+  color: #d4a574;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -114,8 +123,8 @@
 }
 
 .preset-btn:hover {
-  background: rgba(255, 193, 7, 0.2);
-  border-color: #ffc107;
+  background: rgba(139, 101, 78, 0.25);
+  border-color: #d4a574;
 }
 
 /* Price Result Section */
@@ -126,8 +135,8 @@
 }
 
 .price-result-card {
-  background: linear-gradient(135deg, rgba(40, 167, 69, 0.2) 0%, rgba(40, 167, 69, 0.1) 100%);
-  border: 2px solid rgba(40, 167, 69, 0.5);
+  background: linear-gradient(135deg, rgba(139, 101, 78, 0.2) 0%, rgba(101, 67, 33, 0.1) 100%);
+  border: 2px solid rgba(139, 101, 78, 0.4);
   border-radius: 16px;
   padding: 2rem;
   width: 100%;
@@ -140,18 +149,18 @@
   gap: 0.5rem;
   margin-bottom: 1.5rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(40, 167, 69, 0.3);
+  border-bottom: 1px solid rgba(139, 101, 78, 0.3);
 }
 
 .price-label {
-  color: #adb5bd;
+  color: #c9b8a8;
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 .price-amount {
-  color: #51cf66;
+  color: #d4a574;
   font-size: 3.5rem;
   font-weight: 700;
   line-height: 1;
@@ -170,11 +179,11 @@
 }
 
 .detail-label {
-  color: #adb5bd;
+  color: #c9b8a8;
 }
 
 .detail-value {
-  color: #e0e0e0;
+  color: #e8e0d6;
   font-weight: 500;
 }
 
@@ -184,34 +193,47 @@
   align-items: center;
   gap: 1rem;
   padding: 3rem;
-  background: rgba(0, 0, 0, 0.2);
-  border: 2px dashed rgba(255, 193, 7, 0.3);
+  background: rgba(101, 67, 33, 0.15);
+  border: 2px dashed rgba(139, 101, 78, 0.3);
   border-radius: 16px;
   width: 100%;
 }
 
 .placeholder-icon {
-  font-size: 3rem;
   opacity: 0.5;
+  color: #d4a574;
+}
+
+.placeholder-icon svg {
+  stroke: currentColor;
+  fill: none;
 }
 
 .placeholder-text {
-  color: #6c757d;
+  color: #c9b8a8;
   font-size: 0.95rem;
 }
 
 /* Pricing Reference Table */
 .pricing-reference {
-  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
-  border: 1px solid rgba(108, 99, 255, 0.3);
+  background: linear-gradient(135deg, rgba(139, 101, 78, 0.1) 0%, rgba(101, 67, 33, 0.05) 100%);
+  border: 1px solid rgba(139, 101, 78, 0.3);
   border-radius: 16px;
   padding: 1.5rem 2rem;
 }
 
 .pricing-reference h3 {
-  color: #ffffff;
+  color: #d4a574;
   font-size: 1.2rem;
   margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pricing-reference h3 svg {
+  stroke: currentColor;
+  fill: none;
 }
 
 .pricing-table {
@@ -223,11 +245,11 @@
 .pricing-table td {
   padding: 0.8rem 1rem;
   text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(139, 101, 78, 0.2);
 }
 
 .pricing-table th {
-  color: #adb5bd;
+  color: #c9b8a8;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -235,7 +257,7 @@
 }
 
 .pricing-table td {
-  color: #e0e0e0;
+  color: #e8e0d6;
   font-size: 0.95rem;
 }
 
@@ -244,15 +266,15 @@
 }
 
 .pricing-table tr.highlight {
-  background: rgba(255, 193, 7, 0.1);
+  background: rgba(139, 101, 78, 0.15);
 }
 
 .pricing-table tr.highlight td {
-  color: #ffc107;
+  color: #d4a574;
 }
 
 .price-cell {
-  color: #51cf66 !important;
+  color: #d4a574 !important;
   font-weight: 600;
   font-size: 1.1rem !important;
 }
@@ -267,42 +289,50 @@
 }
 
 .voice-badge.standard {
-  background: rgba(108, 117, 125, 0.3);
-  color: #adb5bd;
+  background: rgba(139, 101, 78, 0.2);
+  color: #c9b8a8;
 }
 
 .voice-badge.wavenet {
-  background: rgba(32, 201, 151, 0.2);
-  color: #20c997;
+  background: rgba(139, 101, 78, 0.25);
+  color: #d4a574;
 }
 
 .voice-badge.neural2 {
-  background: rgba(108, 99, 255, 0.2);
-  color: #8b7fff;
+  background: rgba(139, 101, 78, 0.3);
+  color: #d4a574;
 }
 
 .voice-badge.chirp3hd {
-  background: rgba(255, 193, 7, 0.2);
-  color: #ffc107;
+  background: rgba(212, 165, 116, 0.25);
+  color: #d4a574;
 }
 
 .voice-badge.studio {
-  background: rgba(255, 107, 107, 0.2);
-  color: #ff6b6b;
+  background: rgba(232, 168, 124, 0.25);
+  color: #e8a87c;
 }
 
 /* Examples Section */
 .pricing-examples {
-  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
-  border: 1px solid rgba(108, 99, 255, 0.3);
+  background: linear-gradient(135deg, rgba(139, 101, 78, 0.1) 0%, rgba(101, 67, 33, 0.05) 100%);
+  border: 1px solid rgba(139, 101, 78, 0.3);
   border-radius: 16px;
   padding: 1.5rem 2rem;
 }
 
 .pricing-examples h3 {
-  color: #ffffff;
+  color: #d4a574;
   font-size: 1.2rem;
   margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pricing-examples h3 svg {
+  stroke: currentColor;
+  fill: none;
 }
 
 .examples-grid {
@@ -312,8 +342,8 @@
 }
 
 .example-card {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(108, 99, 255, 0.2);
+  background: rgba(101, 67, 33, 0.15);
+  border: 1px solid rgba(139, 101, 78, 0.2);
   border-radius: 12px;
   padding: 1.2rem;
   text-align: center;
@@ -324,28 +354,33 @@
 }
 
 .example-card:hover {
-  border-color: rgba(108, 99, 255, 0.5);
+  border-color: rgba(212, 165, 116, 0.4);
   transform: translateY(-2px);
 }
 
 .example-icon {
-  font-size: 2rem;
   margin-bottom: 0.3rem;
+  color: #d4a574;
+}
+
+.example-icon svg {
+  stroke: currentColor;
+  fill: none;
 }
 
 .example-title {
-  color: #ffffff;
+  color: #e8e0d6;
   font-weight: 600;
   font-size: 0.95rem;
 }
 
 .example-chars {
-  color: #adb5bd;
+  color: #c9b8a8;
   font-size: 0.85rem;
 }
 
 .example-price {
-  color: #51cf66;
+  color: #d4a574;
   font-weight: 600;
   font-size: 0.9rem;
   margin-top: 0.3rem;
@@ -384,4 +419,3 @@
     flex: 0 0 calc(50% - 0.25rem);
   }
 }
-
