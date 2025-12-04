@@ -68,7 +68,7 @@ function createWindow() {
     },
     icon: path.join(__dirname, '../assets/icon.png'),
     title: 'EyeEar Audiobook Generator',
-    backgroundColor: '#0f0f1a',
+    backgroundColor: '#3d2817',
     show: false, // Don't show until ready
   });
 

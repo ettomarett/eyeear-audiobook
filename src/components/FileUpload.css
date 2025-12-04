@@ -6,85 +6,172 @@
 }
 
 .upload-box {
-  background-color: #2d2d2d;
-  border: 2px dashed #404040;
-  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(139, 101, 78, 0.1) 0%, rgba(101, 67, 33, 0.05) 100%);
+  border: 2px dashed rgba(139, 101, 78, 0.4);
+  border-radius: 16px;
   padding: 3rem;
   text-align: center;
-  max-width: 500px;
+  max-width: 600px;
   width: 100%;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
 }
 
 .upload-box:hover {
-  border-color: #6c63ff;
+  border-color: rgba(212, 165, 116, 0.6);
+  box-shadow: 0 8px 24px rgba(139, 101, 78, 0.2);
 }
 
 .upload-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  color: #d4a574;
+  display: flex;
+  justify-content: center;
+}
+
+.upload-icon svg {
+  filter: drop-shadow(0 2px 4px rgba(139, 101, 78, 0.3));
 }
 
 .upload-box h2 {
-  color: #6c63ff;
+  color: #d4a574;
   margin-bottom: 0.5rem;
+  font-size: 1.75rem;
+  font-weight: 600;
 }
 
 .upload-box p {
-  color: #adb5bd;
+  color: #c9b8a8;
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
+}
+
+.info-message {
+  background: rgba(139, 101, 78, 0.15);
+  border: 1px solid rgba(139, 101, 78, 0.3);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
   margin-bottom: 2rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+}
+
+.info-message svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #d4a574;
+}
+
+.info-message span {
+  color: #e8e0d6;
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 .select-file-btn,
 .upload-btn {
-  padding: 12px 24px;
-  background-color: #6c63ff;
-  color: white;
+  padding: 12px 28px;
+  background: linear-gradient(135deg, #8b654e 0%, #a67c52 100%);
+  color: #f5ede3;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
   margin: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(139, 101, 78, 0.3);
 }
 
 .select-file-btn:hover:not(:disabled),
 .upload-btn:hover:not(:disabled) {
-  background-color: #7b73ff;
+  background: linear-gradient(135deg, #a67c52 0%, #b88a5f 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(139, 101, 78, 0.4);
 }
 
 .select-file-btn:disabled,
 .upload-btn:disabled {
-  background-color: #404040;
+  background: rgba(101, 67, 33, 0.3);
   cursor: not-allowed;
   opacity: 0.6;
+  transform: none;
+}
+
+.select-file-btn svg,
+.upload-btn svg {
+  stroke: currentColor;
+  fill: none;
+}
+
+.upload-btn .spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .file-info {
   margin: 1.5rem 0;
-  padding: 1rem;
-  background-color: #1e1e1e;
-  border-radius: 8px;
+  padding: 1.25rem;
+  background: rgba(101, 67, 33, 0.2);
+  border-radius: 10px;
+  border: 1px solid rgba(139, 101, 78, 0.2);
+}
+
+.file-info-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0.5rem;
+}
+
+.file-info-header svg {
+  color: #d4a574;
+  flex-shrink: 0;
 }
 
 .file-name {
-  color: #e0e0e0;
+  color: #e8e0d6;
   font-weight: 600;
-  margin-bottom: 0.25rem;
+  margin: 0;
+  word-break: break-word;
 }
 
 .file-size {
-  color: #adb5bd;
+  color: #c9b8a8;
   font-size: 0.9rem;
+  margin: 0;
+  margin-left: 30px;
 }
 
 .error-message {
-  color: #ff6b6b;
+  color: #e8a87c;
   margin: 1rem 0;
-  padding: 0.75rem;
-  background-color: rgba(255, 107, 107, 0.1);
-  border-radius: 6px;
+  padding: 0.875rem 1rem;
+  background: rgba(232, 168, 124, 0.15);
+  border: 1px solid rgba(232, 168, 124, 0.3);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+}
+
+.error-message svg {
+  flex-shrink: 0;
+  stroke: currentColor;
 }
 
 .upload-progress {
@@ -93,16 +180,23 @@
 
 .progress-bar {
   width: 100%;
-  height: 8px;
-  background-color: #404040;
-  border-radius: 4px;
+  height: 10px;
+  background: rgba(101, 67, 33, 0.3);
+  border-radius: 5px;
   overflow: hidden;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid rgba(139, 101, 78, 0.2);
 }
 
 .progress-fill {
   height: 100%;
-  background-color: #6c63ff;
+  background: linear-gradient(90deg, #8b654e 0%, #a67c52 100%);
   transition: width 0.3s ease;
+  box-shadow: 0 0 8px rgba(212, 165, 116, 0.4);
 }
 
+.upload-progress p {
+  color: #c9b8a8;
+  font-size: 0.9rem;
+  margin: 0;
+}
