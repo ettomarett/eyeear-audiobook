@@ -107,3 +107,12 @@
   font-size: 1.8rem;
   font-weight: 600;
 }
+
+/* New Book Page Layout */
+.new-book-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+}

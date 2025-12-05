@@ -17,6 +17,8 @@ function History({ onSelectBook }) {
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editingFolderName, setEditingFolderName] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
 
   useEffect(() => {
     loadHistory();
@@ -50,6 +52,64 @@ function History({ onSelectBook }) {
       }
     } catch (err) {
       console.error('Error loading folders:', err);
+    }
+  };
+
+  const handleImportAudiobook = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset the input so the same file can be selected again
+    event.target.value = '';
+
+    setImporting(true);
+    setImportProgress(0);
+
+    try {
+      const formData = new FormData();
+      formData.append('audioFile', file);
+      
+      // Extract title from filename (without extension)
+      const bookTitle = file.name.replace(/\.[^/.]+$/, '');
+      formData.append('bookTitle', bookTitle);
+
+      const xhr = new XMLHttpRequest();
+      
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const progress = Math.round((e.loaded / e.total) * 100);
+          setImportProgress(progress);
+        }
+      });
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const response = JSON.parse(xhr.responseText);
+          console.log('Import successful:', response);
+          loadHistory(); // Refresh the library
+          setImporting(false);
+          setImportProgress(0);
+        } else {
+          const errorResponse = JSON.parse(xhr.responseText);
+          throw new Error(errorResponse.error || 'Import failed');
+        }
+      };
+
+      xhr.onerror = () => {
+        setError('Network error during import');
+        setImporting(false);
+        setImportProgress(0);
+      };
+
+      xhr.open('POST', `${API_BASE_URL}/history/import`);
+      xhr.send(formData);
+
+    } catch (err) {
+      console.error('Error importing audiobook:', err);
+      setError(err.message);
+      setImporting(false);
+      setImportProgress(0);
     }
   };
 
@@ -316,6 +376,27 @@ function History({ onSelectBook }) {
           Library
         </h2>
         <div className="history-actions">
+          {/* Hidden file input for import */}
+          <input
+            type="file"
+            id="import-audiobook-input"
+            accept=".mp3,.wav,.m4a,.ogg,.flac,.aac"
+            style={{ display: 'none' }}
+            onChange={handleImportAudiobook}
+          />
+          <button 
+            onClick={() => document.getElementById('import-audiobook-input').click()} 
+            className="import-btn" 
+            title="Import local audiobook"
+            disabled={importing}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            {importing ? `Importing ${importProgress}%` : 'Import'}
+          </button>
           <button onClick={() => setShowNewFolder(true)} className="new-folder-btn" title="New Folder">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -504,13 +585,8 @@ function History({ onSelectBook }) {
                           onClick={(e) => e.stopPropagation()}
                           title="Move to folder"
                         >
-                          <option value="">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                            </svg>
-                            Move...
-                          </option>
-                          <option value="">Uncategorized</option>
+                          <option value="" disabled>📁 Move to folder...</option>
+                          <option value="">— Uncategorized</option>
                           {folders.map(f => (
                             <option key={f.id} value={f.id}>{f.name}</option>
                           ))}

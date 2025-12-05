@@ -55,6 +55,36 @@
   fill: none;
 }
 
+.import-btn {
+  background: linear-gradient(135deg, #8D6E63 0%, #6D4C41 100%);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.import-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(109, 76, 65, 0.3);
+}
+
+.import-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.import-btn svg {
+  stroke: currentColor;
+  fill: none;
+}
+
 .refresh-btn {
   background: rgba(139, 101, 78, 0.1);
   border: 1px solid rgba(139, 101, 78, 0.2);

@@ -3,6 +3,48 @@ const { Storage } = require('@google-cloud/storage');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const jobTrackingService = require('./jobTrackingService');
+
+/**
+ * Decode progressPercent from protobuf-encoded metadata
+ * The SynthesizeLongAudioMetadata has progressPercent as field 3 (double)
+ * Field tag 0x19 (25 decimal) = field number 3, wire type 1 (64-bit)
+ */
+function decodeProgressFromProtobuf(valueData) {
+  try {
+    let bytes;
+    
+    if (valueData?.type === 'Buffer' && Array.isArray(valueData.data)) {
+      bytes = Buffer.from(valueData.data);
+    } else if (Buffer.isBuffer(valueData)) {
+      bytes = valueData;
+    } else if (typeof valueData === 'string') {
+      bytes = Buffer.from(valueData, 'base64');
+    }
+    
+    if (!bytes || bytes.length < 9) {
+      return 0;
+    }
+    
+    // Look for field tag 0x19 (field 3, wire type 1 = 64-bit double)
+    for (let i = 0; i < bytes.length - 8; i++) {
+      if (bytes[i] === 0x19) {
+        // Read the next 8 bytes as little-endian double
+        const doubleBuf = bytes.slice(i + 1, i + 9);
+        const progress = doubleBuf.readDoubleLE(0);
+        if (progress >= 0 && progress <= 100) {
+          console.log(`Decoded progressPercent from protobuf: ${progress.toFixed(1)}%`);
+          return progress;
+        }
+      }
+    }
+    
+    return 0;
+  } catch (error) {
+    console.warn('Failed to decode protobuf progress:', error.message);
+    return 0;
+  }
+}
 
 /**
  * Preprocess text to split overly long sentences for Google TTS
@@ -288,16 +330,55 @@ async function uploadTextToGCS(bucketName, textContent, fileName) {
 }
 
 /**
- * Download audio file from GCS
+ * Download audio file from GCS with progress tracking
  */
-async function downloadAudioFromGCS(bucketName, fileName, localPath) {
+async function downloadAudioFromGCS(bucketName, fileName, localPath, progressCallback) {
   ensureInitialized();
 
   try {
     const bucket = storageClient.bucket(bucketName);
     const file = bucket.file(fileName);
 
-    await file.download({ destination: localPath });
+    // Get file metadata for progress calculation
+    const [metadata] = await file.getMetadata();
+    const totalSize = parseInt(metadata.size || '0');
+
+    // Download with streaming for progress
+    await new Promise((resolve, reject) => {
+      const writeStream = fs.createWriteStream(localPath);
+      const readStream = file.createReadStream();
+      
+      let downloadedBytes = 0;
+      let lastProgress = 0;
+      
+      readStream.on('data', (chunk) => {
+        downloadedBytes += chunk.length;
+        const progress = totalSize > 0 ? Math.round((downloadedBytes / totalSize) * 100) : 0;
+        
+        // Report progress every 2% or at least every 512KB for real-time updates
+        if (progress !== lastProgress && (progress - lastProgress >= 2 || downloadedBytes % (512 * 1024) < chunk.length)) {
+          lastProgress = progress;
+          console.log(`Download progress: ${progress}% (${Math.round(downloadedBytes/1024/1024)}MB/${Math.round(totalSize/1024/1024)}MB)`);
+          
+          if (progressCallback) {
+            progressCallback({
+              step: 'downloading',
+              progress: 90 + Math.floor(progress * 0.1), // Map 0-100% download to 90-100% total
+              downloadProgress: progress,
+              downloadedBytes,
+              totalSize,
+            });
+          }
+        }
+      });
+      
+      readStream.on('error', reject);
+      writeStream.on('error', reject);
+      writeStream.on('finish', resolve);
+      
+      readStream.pipe(writeStream);
+    });
+
     console.log(`Audio downloaded from GCS to: ${localPath}`);
     return localPath;
   } catch (error) {
@@ -329,6 +410,7 @@ async function synthesizeLongAudio(options = {}) {
   const {
     textContent,
     jobId,
+    bookTitle = 'Untitled Book',
     voiceName = 'en-US-Chirp3-HD-Iapetus', // Chirp 3 HD Iapetus Male
     languageCode = 'en-US',
     speakingRate = 1.0,
@@ -410,11 +492,24 @@ async function synthesizeLongAudio(options = {}) {
     console.log(`Starting long audio synthesis for project ${projectId}...`);
     const [operation] = await longAudioClient.synthesizeLongAudio(request);
 
+    // Track this job with its GCS URI and operation name for recovery
+    jobTrackingService.trackJob({
+      jobId,
+      bookTitle,
+      characterCount: textContent.length,
+      operationName: operation.name,
+      gcsOutputUri: outputGcsUri,
+      bucketName,
+      outputFileName,
+      status: 'synthesizing',
+    });
+
     if (progressCallback) {
       progressCallback({ step: 'synthesizing', progress: 20, operationName: operation.name });
     }
 
     console.log(`Long audio synthesis operation started: ${operation.name}`);
+    console.log(`GCS output URI: ${outputGcsUri}`);
 
     // Step 5: Wait for operation to complete with progress updates
     console.log('Waiting for long audio synthesis to complete...');
@@ -442,8 +537,17 @@ async function synthesizeLongAudio(options = {}) {
           const [metadata] = await longAudioClient.checkSynthesizeLongAudioProgress(operation.name);
           
           if (metadata) {
-            // Extract progressPercent from metadata (Google provides this!)
-            const progressPercent = metadata.progressPercent || metadata.metadata?.progressPercent || 0;
+            // Try multiple paths to find progressPercent
+            let progressPercent = 
+              metadata.progressPercent ?? 
+              metadata.metadata?.progressPercent ?? 
+              0;
+            
+            // If progressPercent is still 0, check if metadata has protobuf value
+            if (progressPercent === 0 && metadata.metadata?.value) {
+              progressPercent = decodeProgressFromProtobuf(metadata.metadata.value);
+            }
+            
             lastProgressPercent = progressPercent;
             
             // Map Google's 0-100 progress to our display range (20-90%)
@@ -459,7 +563,7 @@ async function synthesizeLongAudio(options = {}) {
               });
             }
             
-            console.log(`Synthesis progress: ${progressPercent}% (elapsed: ${Math.floor(elapsedSeconds)}s)`);
+            console.log(`Synthesis progress: ${progressPercent}% -> display: ${displayProgress}% (elapsed: ${Math.floor(elapsedSeconds)}s)`);
             
             if (metadata.done) {
               completed = true;
@@ -470,12 +574,22 @@ async function synthesizeLongAudio(options = {}) {
           }
         } catch (checkError) {
           // Fallback: try to get metadata from operation directly
-          console.log('checkSynthesizeLongAudioProgress not available, using operation.getOperation...');
+          console.log('checkSynthesizeLongAudioProgress failed, using getOperation fallback...');
           
           try {
             const [opResult] = await longAudioClient.getOperation({ name: operation.name });
+            
             if (opResult) {
-              const progressPercent = opResult.metadata?.progressPercent || lastProgressPercent;
+              // Decode progressPercent from protobuf metadata
+              let progressPercent = opResult.metadata?.progressPercent ?? 0;
+              
+              if (progressPercent === 0 && opResult.metadata?.value) {
+                progressPercent = decodeProgressFromProtobuf(opResult.metadata.value);
+              }
+              
+              if (progressPercent === 0) {
+                progressPercent = lastProgressPercent;
+              }
               const displayProgress = 20 + Math.floor((progressPercent / 100) * 70);
               
               if (progressCallback) {
@@ -510,8 +624,8 @@ async function synthesizeLongAudio(options = {}) {
           }
         }
         
-        // Wait 3 seconds before next check
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Wait 2 seconds before next check for faster progress updates
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
       // Also wait for operation.promise() to ensure full completion
@@ -531,7 +645,7 @@ async function synthesizeLongAudio(options = {}) {
       
       // Download as WAV (LINEAR16 format) - use timestamped filename
       const localWavPath = path.join(outputDir, `${jobId}_${timestamp}.wav`);
-      await downloadAudioFromGCS(bucketName, outputFileName, localWavPath);
+      await downloadAudioFromGCS(bucketName, outputFileName, localWavPath, progressCallback);
       
       // Convert WAV to MP3 using ffmpeg (if available) for better compatibility
       let localOutputPath = localWavPath;
@@ -569,8 +683,12 @@ async function synthesizeLongAudio(options = {}) {
         const bucket = storageClient.bucket(bucketName);
         await bucket.file(outputFileName).delete();
         console.log('Cleaned up GCS output file');
+        // Mark job as downloaded (GCS cleaned up)
+        jobTrackingService.markJobDownloaded(jobId);
       } catch (cleanupError) {
         console.warn('Failed to clean up GCS file:', cleanupError);
+        // Mark as completed but not cleaned up
+        jobTrackingService.markJobCompleted(jobId, localOutputPath, path.basename(localOutputPath));
       }
 
       if (progressCallback) {
@@ -598,7 +716,7 @@ async function synthesizeLongAudio(options = {}) {
       const maxAttempts = 600; // 30 minutes max (3 second intervals)
 
       while (!completed && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for faster progress updates
 
         try {
           let updatedOperation;
@@ -662,9 +780,15 @@ async function synthesizeLongAudio(options = {}) {
             updatedOperation = await response.json();
           }
           
-          // Extract progressPercent from operation metadata (Google provides this!)
-          const progressPercent = updatedOperation.metadata?.progressPercent || 0;
-          const elapsedSeconds = attempts * 3; // 3 second intervals
+          // Decode progressPercent from protobuf metadata
+          let progressPercent = updatedOperation.metadata?.progressPercent ?? 0;
+          
+          if (progressPercent === 0 && updatedOperation.metadata?.value) {
+            progressPercent = decodeProgressFromProtobuf(updatedOperation.metadata.value);
+          }
+          
+          const elapsedSeconds = attempts * 2;
+          console.log(`HTTP Poll - progressPercent: ${progressPercent.toFixed(1)}%, done: ${updatedOperation.done}`);
           
           // Map Google's 0-100 progress to our display range (20-90%)
           const displayProgress = 20 + Math.floor((progressPercent / 100) * 70);
@@ -702,7 +826,7 @@ async function synthesizeLongAudio(options = {}) {
             
             // Download as WAV (LINEAR16 format) - use timestamped filename
             const localWavPath = path.join(outputDir, `${jobId}_${timestamp}.wav`);
-            await downloadAudioFromGCS(bucketName, outputFileName, localWavPath);
+            await downloadAudioFromGCS(bucketName, outputFileName, localWavPath, progressCallback);
             
             // Convert WAV to MP3 using ffmpeg (if available) for better compatibility
             let localOutputPath = localWavPath;
@@ -740,8 +864,12 @@ async function synthesizeLongAudio(options = {}) {
               const bucket = storageClient.bucket(bucketName);
               await bucket.file(outputFileName).delete();
               console.log('Cleaned up GCS output file');
+              // Mark job as downloaded (GCS cleaned up)
+              jobTrackingService.markJobDownloaded(jobId);
             } catch (cleanupError) {
               console.warn('Failed to clean up GCS file:', cleanupError);
+              // Mark as completed but not cleaned up
+              jobTrackingService.markJobCompleted(jobId, localOutputPath, path.basename(localOutputPath));
             }
 
             if (progressCallback) {
@@ -781,6 +909,8 @@ async function synthesizeLongAudio(options = {}) {
     }
   } catch (error) {
     console.error('Error in long audio synthesis:', error);
+    // Mark job as error
+    jobTrackingService.markJobError(jobId, error.message);
     throw error;
   }
 }

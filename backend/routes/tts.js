@@ -114,9 +114,13 @@ router.post('/generate-long', async (req, res) => {
     const settings = settingsService.loadSettings();
 
     // Start synthesis in background
+    const currentStatus = jobStatuses.get(jobId) || {};
+    const bookTitle = currentStatus.metadata?.bookTitle || metadata.bookTitle || 'Untitled Book';
+    
     synthesizeLongAudio({
       textContent: textContent,
       jobId,
+      bookTitle,
       voiceName: options.voiceName || settings.voiceName || 'en-US-Chirp3-HD-Iapetus',
       languageCode: options.languageCode || settings.languageCode || 'en-US',
       speakingRate: options.speakingRate || settings.speakingRate || 1.0,
@@ -124,14 +128,30 @@ router.post('/generate-long', async (req, res) => {
       bucketName: options.bucketName || settings.gcsBucketName || process.env.GCS_BUCKET_NAME || 'eyeear-ettomarett-app-bucket',
       progressCallback: (progress) => {
         const currentStatus = jobStatuses.get(jobId) || {};
-        jobStatuses.set(jobId, {
+        const updateData = {
           ...currentStatus,
           status: progress.step || 'synthesizing',
           progress: progress.progress || 0,
           operationName: progress.operationName,
           elapsed: progress.elapsed,
           estimated: progress.estimated,
-        });
+          lastUpdate: Date.now(),
+        };
+        
+        // Include download progress if available
+        if (progress.downloadProgress !== undefined) {
+          updateData.downloadProgress = progress.downloadProgress;
+          updateData.downloadedBytes = progress.downloadedBytes;
+          updateData.totalSize = progress.totalSize;
+        }
+        
+        // Include Google's actual progress if available
+        if (progress.googleProgress !== undefined) {
+          updateData.googleProgress = progress.googleProgress;
+        }
+        
+        jobStatuses.set(jobId, updateData);
+        console.log(`Job ${jobId}: ${progress.step} - ${progress.progress}%${progress.googleProgress !== undefined ? ` (Google: ${progress.googleProgress}%)` : ''}`);
       },
     })
       .then((result) => {
@@ -198,7 +218,7 @@ router.post('/generate-long', async (req, res) => {
           bookTitle: metadata.bookTitle || 'Untitled Book',
           filename: filename,
           filePath: result.localPath,
-          characterCount: metadata.characterCount || text.length,
+          characterCount: metadata.characterCount || 0,
           uploadedFilename: metadata.uploadedFilename || null,
         });
       })

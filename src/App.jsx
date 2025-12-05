@@ -6,6 +6,8 @@ import AudioPlayer from './components/AudioPlayer';
 import History from './components/History';
 import Settings from './components/Settings';
 import PriceEstimator from './components/PriceEstimator';
+import Recovery from './components/Recovery';
+import RunningJobs from './components/RunningJobs';
 import './App.css';
 
 const API_BASE_URL = 'http://localhost:3001/api';
@@ -108,6 +110,15 @@ function App() {
             Price
           </button>
           <button
+            className={`nav-btn ${currentView === 'recovery' ? 'active' : ''}`}
+            onClick={() => setCurrentView('recovery')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/>
+            </svg>
+            Recovery
+          </button>
+          <button
             className={`nav-btn ${currentView === 'settings' ? 'active' : ''}`}
             onClick={() => setCurrentView('settings')}
           >
@@ -125,6 +136,8 @@ function App() {
           <Settings />
         ) : currentView === 'price' ? (
           <PriceEstimator />
+        ) : currentView === 'recovery' ? (
+          <Recovery />
         ) : currentView === 'history' ? (
           <History onSelectBook={(book) => {
             setAudioUrl(book.audioUrl);
@@ -133,7 +146,10 @@ function App() {
             setCurrentStep('complete');
           }} />
         ) : (
-          <>
+          <div className="new-book-page">
+            {/* Running Jobs - Always visible on New Book tab */}
+            <RunningJobs />
+
             {currentStep === 'upload' && (
               <FileUpload
                 apiBaseUrl={API_BASE_URL}
@@ -141,40 +157,40 @@ function App() {
               />
             )}
 
-        {(currentStep === 'extracting' || currentStep === 'generating') && (
-          <ProcessingStatus
-            apiBaseUrl={API_BASE_URL}
-            jobId={jobId}
-            bookTitle={bookTitle}
-            uploadedFilename={uploadedFilename}
-            onComplete={handleProcessingComplete}
-            onExtractionComplete={handleExtractionComplete}
-            extractionData={extractionData}
-            currentStep={currentStep}
-          />
-        )}
-
-        {currentStep === 'preview' && extractionData && (
-          <ExtractionPreview
-            bookTitle={bookTitle}
-            characterCount={extractionData.textLength}
-            onGenerateSpeech={handleGenerateSpeech}
-            onCancel={handleCancel}
-          />
-        )}
-
-        {currentStep === 'complete' && audioUrl && (
-          <div className="complete-section">
-            <div className="success-badge">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <h2>Audiobook Ready!</h2>
-            </div>
-            <AudioPlayer audioUrl={audioUrl} bookTitle={bookTitle} onReset={handleNewBook} />
-          </div>
+            {(currentStep === 'extracting' || currentStep === 'generating') && (
+              <ProcessingStatus
+                apiBaseUrl={API_BASE_URL}
+                jobId={jobId}
+                bookTitle={bookTitle}
+                uploadedFilename={uploadedFilename}
+                onComplete={handleProcessingComplete}
+                onExtractionComplete={handleExtractionComplete}
+                extractionData={extractionData}
+                currentStep={currentStep}
+              />
             )}
-          </>
+
+            {currentStep === 'preview' && extractionData && (
+              <ExtractionPreview
+                bookTitle={bookTitle}
+                characterCount={extractionData.textLength}
+                onGenerateSpeech={handleGenerateSpeech}
+                onCancel={handleCancel}
+              />
+            )}
+
+            {currentStep === 'complete' && audioUrl && (
+              <div className="complete-section">
+                <div className="success-badge">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <h2>Audiobook Ready!</h2>
+                </div>
+                <AudioPlayer audioUrl={audioUrl} bookTitle={bookTitle} onReset={handleNewBook} />
+              </div>
+            )}
+          </div>
         )}
       </main>
     </div>

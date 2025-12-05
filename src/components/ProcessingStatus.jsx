@@ -210,9 +210,9 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
 
       // Poll for status updates
       let pollAttempts = 0;
-      const maxPollAttempts = 360; // 30 minutes max (5 second intervals)
+      const maxPollAttempts = 900; // 30 minutes max (2 second intervals)
       let consecutiveErrors = 0;
-      const maxConsecutiveErrors = 30; // Stop after 30 consecutive errors (2.5 minutes)
+      const maxConsecutiveErrors = 60; // Stop after 60 consecutive errors (2 minutes)
       
       const statusInterval = setInterval(async () => {
         pollAttempts++;
@@ -220,7 +220,7 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
         // Stop polling after max attempts
         if (pollAttempts > maxPollAttempts) {
           clearInterval(statusInterval);
-          setError('Status polling timed out. The audiobook may still be processing.');
+          setError('Status polling timed out. The audiobook may still be processing. Check the Recovery tab.');
           return;
         }
         
@@ -247,13 +247,13 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
             if (statusResponse.status === 404) {
               // Job not found - might be completed but status lost after server restart
               // The backend should now check file system, but if still 404, wait a bit more
-              if (pollAttempts < 10) {
-                // Give it a few more tries in case file is still being written
+              if (pollAttempts < 20) {
+                // Give it more tries in case file is still being written
                 return;
               }
-              // After 10 attempts, assume job is lost
+              // After 20 attempts, assume job is lost
               clearInterval(statusInterval);
-              setError('Job status not found. The server may have restarted. Please try generating again.');
+              setError('Job status not found. Check the Recovery tab for completed audiobooks.');
               return;
             }
             throw new Error(`Status check failed: ${statusResponse.status}`);
@@ -261,7 +261,7 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
           
           const status = await statusResponse.json();
 
-          if (status.status === 'completed') {
+          if (status.status === 'completed' || status.status === 'downloaded') {
             clearInterval(statusInterval);
             setProgress(100);
             setCurrentStep('complete');
@@ -293,26 +293,28 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
                 // If verification fails, still try to load (might be a CORS issue)
                 onComplete(audioUrl);
               }
-            }, 1000); // Increased delay to 1 second
+            }, 500);
           } else if (status.status === 'error') {
             clearInterval(statusInterval);
             setError(status.error);
           } else {
-            // Update progress - backend already calculates accurate progress (0-100)
+            // Update progress - backend provides accurate progress (0-100)
             const realProgress = status.progress || 0;
             setProgress(realProgress);
             setBackendStatus(status.status || '');
+            
+            // Update elapsed time
             if (status.elapsed !== undefined) setElapsedTime(status.elapsed);
             if (status.estimated !== undefined) setEstimatedTime(status.estimated);
           }
         } catch (err) {
           // Don't stop polling on individual errors - silently retry
-          if (pollAttempts > 10) {
+          if (pollAttempts > 20) {
             clearInterval(statusInterval);
             setError(`Failed to check status: ${err.message}`);
           }
         }
-      }, 5000); // Poll every 5 seconds (reduced to avoid server overload)
+      }, 2000); // Poll every 2 seconds for real-time updates
 
       return () => clearInterval(statusInterval);
     } catch (err) {
@@ -337,19 +339,27 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
       case 'initializing':
         return 'Initializing TTS service...';
       case 'generating':
-        // Use backend status for more accurate labels
+        // Use backend status for accurate labels
         if (backendStatus === 'preparing') {
-          return 'Preparing audio synthesis...';
+          return `Preparing audio synthesis... ${Math.round(progress)}%`;
         } else if (backendStatus === 'synthesizing') {
           return `Synthesizing audio... ${Math.round(progress)}%`;
         } else if (backendStatus === 'downloading') {
-          return 'Downloading audio from cloud...';
+          // Show download progress (90-100% range)
+          const downloadPercent = progress >= 90 ? Math.round((progress - 90) * 10) : 0;
+          return `Downloading audio from cloud... ${downloadPercent}%`;
         } else if (backendStatus === 'downloaded') {
           return 'Converting to MP3...';
-        } else if (progress < 20) {
+        } else if (backendStatus === 'completed') {
+          return 'Finalizing...';
+        } else if (progress < 15) {
           return 'Starting audio synthesis...';
+        } else if (progress < 20) {
+          return `Preparing synthesis... ${Math.round(progress)}%`;
         } else if (progress < 90) {
           return `Synthesizing audio... ${Math.round(progress)}%`;
+        } else if (progress < 100) {
+          return `Downloading audio... ${Math.round(progress)}%`;
         } else {
           return 'Finalizing audiobook...';
         }

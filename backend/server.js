@@ -23,13 +23,18 @@ const historyRoutes = require('./routes/history');
 const foldersRoutes = require('./routes/folders');
 const bookmarksRoutes = require('./routes/bookmarks');
 const settingsRoutes = require('./routes/settings');
+const recoveryRoutes = require('./routes/recovery');
 const settingsService = require('./services/settingsService');
+const jobTrackingService = require('./services/jobTrackingService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Initialize settings on startup (applies saved settings to environment)
 settingsService.initializeSettings();
+
+// Clean up old job records on startup
+jobTrackingService.cleanupOldJobs();
 
 // Ensure directories exist
 const tempDir = path.join(__dirname, '../temp');
@@ -56,6 +61,7 @@ app.use('/api/history', historyRoutes);
 app.use('/api/folders', foldersRoutes);
 app.use('/api/bookmarks', bookmarksRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/recovery', recoveryRoutes);
 
 // Serve output files (audio files) with proper headers
 app.use('/audio', express.static(outputDir, {
