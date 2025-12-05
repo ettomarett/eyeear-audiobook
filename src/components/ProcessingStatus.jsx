@@ -210,7 +210,9 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
 
       // Poll for status updates
       let pollAttempts = 0;
-      const maxPollAttempts = 600; // 10 minutes max (1 second intervals)
+      const maxPollAttempts = 360; // 30 minutes max (5 second intervals)
+      let consecutiveErrors = 0;
+      const maxConsecutiveErrors = 30; // Stop after 30 consecutive errors (2.5 minutes)
       
       const statusInterval = setInterval(async () => {
         pollAttempts++;
@@ -226,18 +228,18 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
           let statusResponse;
           try {
             statusResponse = await fetch(`${apiBaseUrl}/tts/status/${jobId}`);
+            consecutiveErrors = 0; // Reset on success
           } catch (fetchError) {
             // Handle network errors (connection refused, server restart, etc.)
-            // Silently retry on next poll - don't log these transient errors
-            const errorMsg = fetchError?.message || String(fetchError) || '';
-            if (errorMsg.includes('Failed to fetch') || 
-                errorMsg.includes('ERR_CONNECTION_REFUSED') || 
-                errorMsg.includes('NetworkError') ||
-                errorMsg.includes('Network request failed')) {
-              // Silently retry on next poll - server might be restarting
+            consecutiveErrors++;
+            
+            if (consecutiveErrors >= maxConsecutiveErrors) {
+              clearInterval(statusInterval);
+              setError('Backend server appears to be down. Please restart the application and try again.');
               return;
             }
-            // For other errors, just return and retry (don't throw to avoid uncaught promise)
+            
+            // Silently retry on next poll - don't log these transient errors
             return;
           }
           
@@ -310,7 +312,7 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
             setError(`Failed to check status: ${err.message}`);
           }
         }
-      }, 1000);
+      }, 5000); // Poll every 5 seconds (reduced to avoid server overload)
 
       return () => clearInterval(statusInterval);
     } catch (err) {

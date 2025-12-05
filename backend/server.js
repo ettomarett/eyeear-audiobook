@@ -4,6 +4,17 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
+// Handle uncaught exceptions and unhandled rejections to prevent server crashes
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // Don't exit - keep server running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit - keep server running
+});
+
 const uploadRoutes = require('./routes/upload');
 const extractRoutes = require('./routes/extract');
 const ttsRoutes = require('./routes/tts');
