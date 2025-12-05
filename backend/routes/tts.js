@@ -55,9 +55,22 @@ router.post('/generate-long', async (req, res) => {
     const textFilePath = path.join(__dirname, '../../temp', `${jobId}.txt`);
     let textContent = text;
     
-    if (!textContent && fs.existsSync(textFilePath)) {
-      // Read from temp file if text not provided in body
-      textContent = fs.readFileSync(textFilePath, 'utf8');
+    // If text not provided in body, read from temp file
+    if (!textContent || textContent.trim().length === 0) {
+      if (fs.existsSync(textFilePath)) {
+        try {
+          textContent = fs.readFileSync(textFilePath, 'utf8');
+        } catch (readError) {
+          console.error(`Error reading text file for jobId ${jobId}:`, readError);
+          return res.status(400).json({ 
+            error: `Failed to read text file: ${readError.message}. Please ensure text extraction completed successfully.` 
+          });
+        }
+      } else {
+        return res.status(400).json({ 
+          error: `Text file not found for jobId ${jobId}. Please ensure text extraction completed successfully before generating TTS.` 
+        });
+      }
     }
 
     if (!textContent || textContent.trim().length === 0) {
