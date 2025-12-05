@@ -10,7 +10,7 @@
     "dev:all": "concurrently \"npm run dev:react\" \"npm run dev:electron\" \"npm run dev:backend\"",
     "dev:react": "vite",
     "dev:electron": "wait-on tcp:5173 -t 30000 && ELECTRON_DISABLE_SANDBOX=1 START_BACKEND=false electron --no-sandbox .",
-    "dev:backend": "nodemon backend/server.js",
+    "dev:backend": "NODE_OPTIONS='--max-old-space-size=4096' nodemon backend/server.js",
     "start": "ELECTRON_DISABLE_SANDBOX=1 electron --no-sandbox .",
     "start:standalone": "ELECTRON_DISABLE_SANDBOX=1 electron --no-sandbox .",
     "build": "npm run build:react && npm run build:electron",

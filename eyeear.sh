@@ -37,9 +37,9 @@ echo "📦 Starting frontend server..."
 npm run dev:react > /dev/null 2>&1 &
 VITE_PID=$!
 
-# Start backend server in background
+# Start backend server in background with increased memory limit
 echo "🔧 Starting backend server..."
-node backend/server.js > /dev/null 2>&1 &
+node --max-old-space-size=4096 backend/server.js > /dev/null 2>&1 &
 BACKEND_PID=$!
 
 # Wait for Vite to be ready
