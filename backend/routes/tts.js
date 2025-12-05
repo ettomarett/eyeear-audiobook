@@ -75,7 +75,7 @@ router.post('/generate-long', async (req, res) => {
       progress: 0,
       metadata: {
         bookTitle: metadata.bookTitle || 'Untitled Book',
-        characterCount: text.length,
+        characterCount: textContent.length,
         uploadedFilename: metadata.uploadedFilename || null,
       },
     });
@@ -156,7 +156,7 @@ router.post('/generate-long', async (req, res) => {
           filename: filename,
           metadata: {
             bookTitle: metadata.bookTitle || 'Untitled Book',
-            characterCount: metadata.characterCount || text.length,
+            characterCount: metadata.characterCount || textContent.length,
             uploadedFilename: metadata.uploadedFilename || null,
           },
           createdAt: new Date().toISOString(),
