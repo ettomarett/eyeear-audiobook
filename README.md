@@ -11,6 +11,8 @@ Listen to a sample generated with WaveNet voice:
 https://github.com/user-attachments/assets/d1d3a822-9dfa-41e9-aad2-a35190dddd40
 
 [⬇️ Download MP3](wavenet_voice_sample.mp3)
+
+for more samples and info about the supported voices and languages : [list-voices-and-types](https://docs.cloud.google.com/text-to-speech/docs/list-voices-and-types)
 ## Sneak Peek
 
 ![Screenshot 1](sneakpeek/Pasted_image_20251205040501.png)
@@ -203,6 +205,18 @@ EyeEar provides access to 100+ voices across categories:
 - **Standard** - Basic text-to-speech voices
 
 Languages include: English (US, UK, AU, IN), Spanish, French, German, Italian, Portuguese, Japanese, Korean, Chinese, Hindi, Arabic, Dutch, Russian, Polish, Turkish, Swedish, Norwegian, Danish, Finnish, Greek, Hebrew, Czech, Romanian, Hungarian, Ukrainian, Vietnamese, Thai, Indonesian, and more.
+
+## Quotas and Limit
+
+4 million characters (of WaveNet) is equivalent to 8 books of a little over 200 pages each, 8 hours each. That's a nice thing to have for free isn't it :
+
+<img width="1674" height="754" alt="image" src="https://github.com/user-attachments/assets/a0e79ba2-e2a4-435b-8aa3-55a0bce9fef3" />
+&nbsp;
+
+<img width="1671" height="510" alt="image" src="https://github.com/user-attachments/assets/435f3d89-9860-402c-87c3-21b51d2f8626" />
+&nbsp;
+
+<img width="1661" height="745" alt="image" src="https://github.com/user-attachments/assets/5512b5b5-09e5-4320-97c8-4d91a26308cd" />
 
 ## 🛠️ Development
 
