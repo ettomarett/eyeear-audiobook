@@ -47,16 +47,25 @@ router.post('/generate-long', async (req, res) => {
     const { jobId: reqJobId, text, options = {}, metadata = {} } = req.body;
     jobId = reqJobId;
 
-    if (!jobId || !text) {
-      return res.status(400).json({ error: 'JobId and text are required' });
+    if (!jobId) {
+      return res.status(400).json({ error: 'JobId is required' });
     }
 
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: 'Text is empty' });
+    // Try to read text from temp file first (more efficient for large files)
+    const textFilePath = path.join(__dirname, '../../temp', `${jobId}.txt`);
+    let textContent = text;
+    
+    if (!textContent && fs.existsSync(textFilePath)) {
+      // Read from temp file if text not provided in body
+      textContent = fs.readFileSync(textFilePath, 'utf8');
+    }
+
+    if (!textContent || textContent.trim().length === 0) {
+      return res.status(400).json({ error: 'Text is empty. Please ensure text extraction completed successfully.' });
     }
 
     // Check text length - long audio supports up to 1 million characters
-    if (text.length > 1000000) {
+    if (textContent.length > 1000000) {
       return res.status(400).json({ error: 'Text is too long. Maximum 1 million characters for long audio synthesis.' });
     }
 
@@ -93,7 +102,7 @@ router.post('/generate-long', async (req, res) => {
 
     // Start synthesis in background
     synthesizeLongAudio({
-      textContent: text,
+      textContent: textContent,
       jobId,
       voiceName: options.voiceName || settings.voiceName || 'en-US-Chirp3-HD-Iapetus',
       languageCode: options.languageCode || settings.languageCode || 'en-US',

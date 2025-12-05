@@ -180,12 +180,13 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
       setCurrentStep('generating');
       setProgress(40);
 
+      // Don't send text in body - backend will read from temp file to avoid payload size issues
       const generateResponse = await fetch(`${apiBaseUrl}/tts/generate-long`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jobId,
-          text: textContent,
+          // text is optional - backend reads from temp file if not provided
           options: {
             voiceName: 'en-US-Chirp3-HD-Iapetus',
             languageCode: 'en-US',
