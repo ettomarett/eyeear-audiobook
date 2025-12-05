@@ -4,6 +4,159 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+/**
+ * Preprocess text to split overly long sentences for Google TTS
+ * Google TTS has a limit on sentence length - this function adds natural breaks
+ */
+function preprocessTextForTTS(text, maxSentenceLength = 350) {
+  if (!text) return text;
+  
+  // Split text into sentences first (by . ! ?)
+  const sentenceRegex = /([^.!?]*[.!?]+\s*)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = sentenceRegex.exec(text)) !== null) {
+    parts.push(match[1]);
+    lastIndex = sentenceRegex.lastIndex;
+  }
+  
+  // Add any remaining text (without ending punctuation)
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  // Process each part - if too long, split it
+  const processedParts = parts.map(part => splitLongSentence(part, maxSentenceLength));
+  
+  return processedParts.join('');
+}
+
+/**
+ * Split a long sentence into smaller chunks at natural break points
+ */
+function splitLongSentence(sentence, maxLength) {
+  if (!sentence || sentence.length <= maxLength) {
+    return sentence;
+  }
+  
+  const result = [];
+  let remaining = sentence.trim();
+  
+  while (remaining.length > maxLength) {
+    // Find the best break point within maxLength
+    const breakPoint = findBestBreakPoint(remaining, maxLength);
+    
+    if (breakPoint <= 0) {
+      // No good break point found, force break at word boundary
+      const forcedBreak = findWordBoundary(remaining, maxLength);
+      if (forcedBreak > 0) {
+        result.push(remaining.substring(0, forcedBreak).trim() + '.');
+        remaining = remaining.substring(forcedBreak).trim();
+      } else {
+        // Last resort: just break at maxLength
+        result.push(remaining.substring(0, maxLength).trim() + '.');
+        remaining = remaining.substring(maxLength).trim();
+      }
+    } else {
+      const chunk = remaining.substring(0, breakPoint).trim();
+      remaining = remaining.substring(breakPoint).trim();
+      
+      // Remove leading punctuation from remaining if we split at punctuation
+      if (remaining.startsWith(',') || remaining.startsWith(';') || remaining.startsWith(':')) {
+        remaining = remaining.substring(1).trim();
+      }
+      
+      // Add period if chunk doesn't end with punctuation
+      if (!/[.!?]$/.test(chunk)) {
+        result.push(chunk + '.');
+      } else {
+        result.push(chunk);
+      }
+    }
+  }
+  
+  // Add remaining text
+  if (remaining) {
+    result.push(remaining);
+  }
+  
+  return result.join(' ');
+}
+
+/**
+ * Find the best natural break point in text
+ * Priority: semicolon > colon > comma+conjunction > comma > word boundary
+ */
+function findBestBreakPoint(text, maxLength) {
+  const searchArea = text.substring(0, maxLength);
+  
+  // 1. Look for semicolons (strongest break)
+  let pos = searchArea.lastIndexOf(';');
+  if (pos > maxLength * 0.3) return pos + 1;
+  
+  // 2. Look for colon followed by space
+  pos = searchArea.lastIndexOf(': ');
+  if (pos > maxLength * 0.3) return pos + 1;
+  
+  // 3. Look for comma + coordinating conjunction (and, but, or, so, yet, for, nor)
+  const conjunctionPattern = /,\s*(and|but|or|so|yet|for|nor|however|therefore|meanwhile|then|also)\s/gi;
+  let lastConjMatch = null;
+  let conjMatch;
+  while ((conjMatch = conjunctionPattern.exec(searchArea)) !== null) {
+    if (conjMatch.index > maxLength * 0.3) {
+      lastConjMatch = conjMatch;
+    }
+  }
+  if (lastConjMatch) {
+    // Break after the comma, before the conjunction
+    return lastConjMatch.index + 1;
+  }
+  
+  // 4. Look for em-dash or double hyphen
+  pos = searchArea.lastIndexOf('—');
+  if (pos > maxLength * 0.3) return pos + 1;
+  pos = searchArea.lastIndexOf('--');
+  if (pos > maxLength * 0.3) return pos + 2;
+  
+  // 5. Look for any comma (weaker break)
+  pos = searchArea.lastIndexOf(',');
+  if (pos > maxLength * 0.4) return pos + 1;
+  
+  // 6. Fall back to word boundary
+  return findWordBoundary(text, maxLength);
+}
+
+/**
+ * Find a word boundary near the target position
+ */
+function findWordBoundary(text, targetPos) {
+  // Look for the last space before targetPos
+  const searchArea = text.substring(0, targetPos);
+  const lastSpace = searchArea.lastIndexOf(' ');
+  
+  if (lastSpace > targetPos * 0.3) {
+    return lastSpace;
+  }
+  
+  return -1;
+}
+
+/**
+ * Log statistics about text preprocessing
+ */
+function logPreprocessingStats(original, processed) {
+  const originalSentences = (original.match(/[.!?]+/g) || []).length;
+  const processedSentences = (processed.match(/[.!?]+/g) || []).length;
+  const addedBreaks = processedSentences - originalSentences;
+  
+  if (addedBreaks > 0) {
+    console.log(`Text preprocessing: Added ${addedBreaks} sentence breaks to prevent TTS errors`);
+    console.log(`  Original sentences: ~${originalSentences}, Processed: ~${processedSentences}`);
+  }
+}
+
 // Initialize clients
 let longAudioClient = null;
 let storageClient = null;
@@ -189,6 +342,11 @@ async function synthesizeLongAudio(options = {}) {
     throw new Error('textContent and jobId are required');
   }
 
+  // Preprocess text to split long sentences that would cause Google TTS to fail
+  console.log(`Preprocessing text (${textContent.length} characters) to split long sentences...`);
+  const processedText = preprocessTextForTTS(textContent, 350);
+  logPreprocessingStats(textContent, processedText);
+
   try {
     // Get project ID from credentials
     const credsPath = process.env.GOOGLE_CREDENTIALS_PATH ||
@@ -234,7 +392,7 @@ async function synthesizeLongAudio(options = {}) {
     const request = {
       parent: parent,
       input: {
-        text: textContent, // Direct text input (up to 1MB)
+        text: processedText, // Preprocessed text with long sentences split
       },
       voice: {
         languageCode,
