@@ -262,26 +262,15 @@ async function synthesizeLongAudio(options = {}) {
     console.log('Waiting for long audio synthesis to complete...');
     
     try {
-      // Estimate synthesis time based on text length
-      // Google TTS processes roughly 100-150 characters per second
-      const estimatedSeconds = Math.max(30, Math.ceil(textContent.length / 120));
-      const timeoutSeconds = Math.max(600, estimatedSeconds * 3); // 3x estimated time as timeout
-      
-      console.log(`Estimated synthesis time: ~${estimatedSeconds}s for ${textContent.length} characters`);
-      
-      // Poll for completion with progress updates
+      const timeoutSeconds = 1800; // 30 minutes max timeout
       const startTime = Date.now();
+      
+      console.log(`Starting synthesis for ${textContent.length} characters...`);
+      
+      // Poll for completion using Google's actual progressPercent
       let completed = false;
-      let result = null;
+      let lastProgressPercent = 0;
       
-      // Start a separate promise that resolves when operation completes
-      const operationPromise = operation.promise().then(r => {
-        completed = true;
-        result = r;
-        return r;
-      });
-      
-      // Progress update loop
       while (!completed) {
         const elapsedSeconds = (Date.now() - startTime) / 1000;
         
@@ -290,27 +279,85 @@ async function synthesizeLongAudio(options = {}) {
           throw new Error(`Operation timed out after ${timeoutSeconds} seconds`);
         }
         
-        // Calculate estimated progress (20% to 85% during synthesis)
-        // Use a curve that slows down as it approaches completion
-        const estimatedProgress = Math.min(0.95, elapsedSeconds / estimatedSeconds);
-        const displayProgress = 20 + Math.floor(estimatedProgress * 65); // 20-85%
-        
-        if (progressCallback) {
-          progressCallback({ 
-            step: 'synthesizing', 
-            progress: displayProgress,
-            operationName: operation.name,
-            elapsed: Math.floor(elapsedSeconds),
-            estimated: estimatedSeconds
-          });
+        // Get operation metadata with actual progress
+        try {
+          const [metadata] = await longAudioClient.checkSynthesizeLongAudioProgress(operation.name);
+          
+          if (metadata) {
+            // Extract progressPercent from metadata (Google provides this!)
+            const progressPercent = metadata.progressPercent || metadata.metadata?.progressPercent || 0;
+            lastProgressPercent = progressPercent;
+            
+            // Map Google's 0-100 progress to our display range (20-90%)
+            const displayProgress = 20 + Math.floor((progressPercent / 100) * 70);
+            
+            if (progressCallback) {
+              progressCallback({ 
+                step: 'synthesizing', 
+                progress: displayProgress,
+                operationName: operation.name,
+                elapsed: Math.floor(elapsedSeconds),
+                googleProgress: progressPercent
+              });
+            }
+            
+            console.log(`Synthesis progress: ${progressPercent}% (elapsed: ${Math.floor(elapsedSeconds)}s)`);
+            
+            if (metadata.done) {
+              completed = true;
+              if (metadata.error) {
+                throw new Error(`Long audio synthesis failed: ${metadata.error.message || JSON.stringify(metadata.error)}`);
+              }
+            }
+          }
+        } catch (checkError) {
+          // Fallback: try to get metadata from operation directly
+          console.log('checkSynthesizeLongAudioProgress not available, using operation.getOperation...');
+          
+          try {
+            const [opResult] = await longAudioClient.getOperation({ name: operation.name });
+            if (opResult) {
+              const progressPercent = opResult.metadata?.progressPercent || lastProgressPercent;
+              const displayProgress = 20 + Math.floor((progressPercent / 100) * 70);
+              
+              if (progressCallback) {
+                progressCallback({ 
+                  step: 'synthesizing', 
+                  progress: displayProgress,
+                  operationName: operation.name,
+                  elapsed: Math.floor(elapsedSeconds),
+                  googleProgress: progressPercent
+                });
+              }
+              
+              if (opResult.done) {
+                completed = true;
+                if (opResult.error) {
+                  throw new Error(`Long audio synthesis failed: ${opResult.error.message || JSON.stringify(opResult.error)}`);
+                }
+              }
+            }
+          } catch (getOpError) {
+            // Last fallback: just wait for operation.promise()
+            console.log('getOperation not available, waiting for operation promise...');
+            const displayProgress = 20 + Math.floor((lastProgressPercent / 100) * 70);
+            if (progressCallback) {
+              progressCallback({ 
+                step: 'synthesizing', 
+                progress: Math.max(displayProgress, 25),
+                operationName: operation.name,
+                elapsed: Math.floor(elapsedSeconds)
+              });
+            }
+          }
         }
         
-        // Wait 2 seconds before next check
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait 3 seconds before next check
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
       
-      // Wait for the operation promise to fully resolve
-      await operationPromise;
+      // Also wait for operation.promise() to ensure full completion
+      await operation.promise();
       
       console.log('Long audio synthesis completed!');
       
@@ -390,10 +437,10 @@ async function synthesizeLongAudio(options = {}) {
 
       let completed = false;
       let attempts = 0;
-      const maxAttempts = 600; // 20 minutes max (2 second intervals)
+      const maxAttempts = 600; // 30 minutes max (3 second intervals)
 
       while (!completed && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
 
         try {
           let updatedOperation;
@@ -456,6 +503,25 @@ async function synthesizeLongAudio(options = {}) {
             
             updatedOperation = await response.json();
           }
+          
+          // Extract progressPercent from operation metadata (Google provides this!)
+          const progressPercent = updatedOperation.metadata?.progressPercent || 0;
+          const elapsedSeconds = attempts * 3; // 3 second intervals
+          
+          // Map Google's 0-100 progress to our display range (20-90%)
+          const displayProgress = 20 + Math.floor((progressPercent / 100) * 70);
+          
+          if (progressCallback && !updatedOperation.done) {
+            progressCallback({ 
+              step: 'synthesizing', 
+              progress: displayProgress,
+              operationName: operation.name,
+              elapsed: elapsedSeconds,
+              googleProgress: progressPercent
+            });
+          }
+          
+          console.log(`Synthesis progress (HTTP poll): ${progressPercent}% (attempt ${attempts})`);
           
           if (updatedOperation.done) {
             completed = true;
