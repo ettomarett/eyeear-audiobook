@@ -55,7 +55,100 @@ function History({ onSelectBook }) {
     }
   };
 
+  // Store file handles in IndexedDB for File System Access API
+  const storeFileHandle = async (fileHandle, bookId) => {
+    try {
+      if (!('indexedDB' in window)) {
+        console.warn('IndexedDB not available');
+        return false;
+      }
+
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('eyeear-file-handles', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains('handles')) {
+            db.createObjectStore('handles', { keyPath: 'bookId' });
+          }
+        };
+      });
+
+      const transaction = db.transaction(['handles'], 'readwrite');
+      const store = transaction.objectStore('handles');
+      await store.put({ bookId, fileHandle, fileName: fileHandle.name });
+      return true;
+    } catch (err) {
+      console.error('Error storing file handle:', err);
+      return false;
+    }
+  };
+
   const handleImportAudiobook = async (event) => {
+    // Try File System Access API first (modern browsers)
+    if ('showOpenFilePicker' in window) {
+      try {
+        setImporting(true);
+        setImportProgress(0);
+        setError('');
+
+        const fileHandles = await window.showOpenFilePicker({
+          types: [{
+            description: 'Audio files',
+            accept: {
+              'audio/*': ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac']
+            }
+          }],
+          multiple: false
+        });
+
+        const fileHandle = fileHandles[0];
+        const file = await fileHandle.getFile();
+        const bookTitle = file.name.replace(/\.[^/.]+$/, '');
+        const jobId = `import_${Date.now()}`;
+
+        // Store file handle in IndexedDB for later access
+        await storeFileHandle(fileHandle, jobId);
+
+        // Import using file handle approach
+        const response = await fetch(`${API_BASE_URL}/history/import-handle`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            bookId: jobId,
+            fileName: file.name,
+            bookTitle: bookTitle,
+            fileSize: file.size,
+            fileType: file.type,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          console.log('Import successful with file handle:', result);
+          loadHistory(); // Refresh the library
+          setError('');
+        } else {
+          throw new Error(result.error || 'Import failed');
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          // User cancelled the file picker
+          setError('');
+        } else {
+          console.error('Error importing with File System Access API:', err);
+          setError(err.message || 'Failed to import audiobook');
+        }
+      } finally {
+        setImporting(false);
+        setImportProgress(0);
+      }
+      return;
+    }
+
+    // Fallback to regular file input (Electron or older browsers)
     const file = event.target.files?.[0];
     if (!file) {
       // Reset the input so the same file can be selected again
@@ -88,7 +181,7 @@ function History({ onSelectBook }) {
       if (!filePath) {
         // Fallback: try to construct a path or use the file name
         // This won't work for local file access in browsers, but might work in Electron
-        throw new Error('Could not determine file path. Please ensure you are using the Electron desktop app. The file path is not accessible in web browsers for security reasons.');
+        throw new Error('Could not determine file path. Please ensure you are using the Electron desktop app or a modern browser that supports File System Access API.');
       }
 
       console.log('Importing file with path:', filePath);
@@ -120,8 +213,63 @@ function History({ onSelectBook }) {
     }
   };
 
+  // Retrieve file handle from IndexedDB
+  const getFileHandle = async (bookId) => {
+    try {
+      if (!('indexedDB' in window)) {
+        return null;
+      }
+
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('eyeear-file-handles', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains('handles')) {
+            db.createObjectStore('handles', { keyPath: 'bookId' });
+          }
+        };
+      });
+
+      const transaction = db.transaction(['handles'], 'readonly');
+      const store = transaction.objectStore('handles');
+      const request = store.get(bookId);
+      
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result?.fileHandle || null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (err) {
+      console.error('Error retrieving file handle:', err);
+      return null;
+    }
+  };
+
   const handleBookClick = async (book) => {
-    // Check if file exists before playing
+    // Check if this is a file handle import (stored in IndexedDB)
+    const fileHandle = await getFileHandle(book.id);
+    
+    if (fileHandle) {
+      // Use File System Access API to read the file
+      try {
+        const file = await fileHandle.getFile();
+        const audioUrl = URL.createObjectURL(file);
+        
+        setSelectedBook({
+          ...book,
+          audioUrl,
+          isFileHandle: true, // Mark as file handle so we can revoke URL later
+        });
+        return;
+      } catch (err) {
+        console.error('Error reading file from handle:', err);
+        setError('Failed to access file. You may need to re-import the file.');
+        return;
+      }
+    }
+
+    // Fallback to regular file path check
     try {
       const response = await fetch(`${API_BASE_URL}/history/${book.id}/check-file`);
       const result = await response.json();
@@ -401,7 +549,7 @@ function History({ onSelectBook }) {
           Library
         </h2>
         <div className="history-actions">
-          {/* Hidden file input for import */}
+          {/* Hidden file input for import (fallback for Electron/older browsers) */}
           <input
             type="file"
             id="import-audiobook-input"
@@ -410,9 +558,17 @@ function History({ onSelectBook }) {
             onChange={handleImportAudiobook}
           />
           <button 
-            onClick={() => document.getElementById('import-audiobook-input').click()} 
+            onClick={async () => {
+              // Try File System Access API first if available
+              if ('showOpenFilePicker' in window) {
+                await handleImportAudiobook({ target: { files: [] } });
+              } else {
+                // Fallback to regular file input
+                document.getElementById('import-audiobook-input').click();
+              }
+            }}
             className="import-btn" 
-            title="Import local audiobook"
+            title="Import local audiobook (uses File System Access API in modern browsers)"
             disabled={importing}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

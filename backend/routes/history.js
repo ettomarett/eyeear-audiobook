@@ -232,6 +232,17 @@ router.get('/:id/check-file', (req, res) => {
       return res.status(404).json({ error: 'History entry not found', exists: false });
     }
 
+    // For file handle imports, the file is stored in browser's IndexedDB
+    // We can't check its existence server-side, so we assume it exists if the entry exists
+    if (entry.isFileHandle) {
+      return res.json({ 
+        exists: true, // Assume exists - browser will handle access
+        filePath: null,
+        filename: entry.filename,
+        isFileHandle: true
+      });
+    }
+
     // Check if file exists at the stored path
     const filePath = entry.filePath || path.join(outputDir, entry.filename);
     const exists = fs.existsSync(filePath);
@@ -239,7 +250,8 @@ router.get('/:id/check-file', (req, res) => {
     res.json({ 
       exists,
       filePath: entry.filePath || null,
-      filename: entry.filename 
+      filename: entry.filename,
+      isFileHandle: false
     });
   } catch (error) {
     console.error('Error checking file:', error);
@@ -288,6 +300,69 @@ router.get('/:id/file', (req, res) => {
     fileStream.pipe(res);
   } catch (error) {
     console.error('Error serving file:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Import a local audio file using File System Access API (file handle stored in browser)
+router.post('/import-handle', (req, res) => {
+  try {
+    const { bookId, fileName, bookTitle, fileSize, fileType } = req.body;
+    
+    if (!bookId || !fileName) {
+      return res.status(400).json({ error: 'Book ID and file name are required' });
+    }
+
+    // Extract book title from filename if not provided
+    const finalBookTitle = bookTitle || path.basename(fileName, path.extname(fileName));
+    const ext = path.extname(fileName).toLowerCase();
+
+    // Create metadata for the imported file (file handle is stored in browser's IndexedDB)
+    const entry = addToHistory({
+      jobId: bookId,
+      bookTitle: finalBookTitle,
+      filename: fileName,
+      filePath: null, // No file path - using file handle instead
+      characterCount: 0,
+      createdAt: new Date().toISOString(),
+      uploadedFilename: fileName,
+      isImported: true,
+      isLocalPath: false, // Not a local path, but a file handle
+      isFileHandle: true, // Mark as file handle import
+      fileSize: fileSize || 0,
+      fileType: fileType || `audio/${ext.slice(1)}`,
+    });
+
+    // Create a metadata file for consistency
+    const metadataPath = path.join(outputDir, `${bookId}.metadata.json`);
+    const metadata = {
+      jobId: bookId,
+      filename: fileName,
+      outputPath: null, // No server-side path
+      status: 'completed',
+      createdAt: new Date().toISOString(),
+      metadata: {
+        bookTitle: finalBookTitle,
+        uploadedFilename: fileName,
+        characterCount: 0,
+        isImported: true,
+        isLocalPath: false,
+        isFileHandle: true,
+        fileSize: fileSize || 0,
+        fileType: fileType || `audio/${ext.slice(1)}`,
+      }
+    };
+    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+
+    console.log(`Imported audiobook via file handle: ${finalBookTitle} (${fileName})`);
+    
+    res.json({
+      success: true,
+      message: 'Audiobook imported successfully (using File System Access API)',
+      entry: entry
+    });
+  } catch (error) {
+    console.error('Error importing audiobook via file handle:', error);
     res.status(500).json({ error: error.message });
   }
 });

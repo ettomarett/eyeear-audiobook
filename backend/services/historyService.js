@@ -57,6 +57,9 @@ function addToHistory(metadata) {
     uploadedFilename: metadata.uploadedFilename || null,
     isImported: metadata.isImported || false,
     isLocalPath: metadata.isLocalPath || false,
+    isFileHandle: metadata.isFileHandle || false,
+    fileSize: metadata.fileSize || null,
+    fileType: metadata.fileType || null,
   };
 
   // Check if entry already exists (by id) and update it, otherwise add new
