@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AudioPlayer from './AudioPlayer';
 import './History.css';
 
@@ -20,10 +20,22 @@ function History({ onSelectBook }) {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
 
+  const blobUrlRef = useRef(null);
+
   useEffect(() => {
     loadHistory();
     loadFolders();
   }, []);
+
+  // Cleanup blob URLs when component unmounts or selected book changes
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, [selectedBook]);
 
   const loadHistory = async () => {
     try {
@@ -253,8 +265,14 @@ function History({ onSelectBook }) {
     if (fileHandle) {
       // Use File System Access API to read the file
       try {
+        // Cleanup previous blob URL if exists
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current);
+        }
+        
         const file = await fileHandle.getFile();
         const audioUrl = URL.createObjectURL(file);
+        blobUrlRef.current = audioUrl; // Store for cleanup
         
         setSelectedBook({
           ...book,
