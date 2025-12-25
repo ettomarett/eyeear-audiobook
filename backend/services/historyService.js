@@ -55,6 +55,8 @@ function addToHistory(metadata) {
     characterCount: metadata.characterCount || 0,
     createdAt: metadata.createdAt || new Date().toISOString(),
     uploadedFilename: metadata.uploadedFilename || null,
+    isImported: metadata.isImported || false,
+    isLocalPath: metadata.isLocalPath || false,
   };
 
   // Check if entry already exists (by id) and update it, otherwise add new
@@ -121,14 +123,27 @@ function getHistory() {
         }
       }
       
+      // Check if file exists (for local path imports)
+      const filePath = metadata.outputPath || entry.filePath;
+      let fileExists = true;
+      if (filePath) {
+        fileExists = fs.existsSync(filePath);
+      } else if (entry.filename) {
+        const defaultPath = path.join(outputDir, entry.filename);
+        fileExists = fs.existsSync(defaultPath);
+      }
+      
       // Update entry with metadata from file (prefer metadata file over history.json)
       return {
         ...entry,
         bookTitle: bookTitle,
         characterCount: metadata.metadata.characterCount || entry.characterCount,
         filename: metadata.filename || entry.filename,
-        filePath: metadata.outputPath || entry.filePath,
+        filePath: filePath,
         uploadedFilename: metadata.metadata.uploadedFilename || entry.uploadedFilename,
+        isImported: metadata.metadata.isImported || entry.isImported || false,
+        isLocalPath: metadata.metadata.isLocalPath || entry.isLocalPath || false,
+        fileExists: fileExists, // Add file existence status
       };
     }
     
@@ -141,6 +156,16 @@ function getHistory() {
         entry.bookTitle = extractBookTitleFromFilename(entry.filename);
       }
     }
+    
+    // Check if file exists for entries without metadata
+    let fileExists = true;
+    if (entry.filePath) {
+      fileExists = fs.existsSync(entry.filePath);
+    } else if (entry.filename) {
+      const defaultPath = path.join(outputDir, entry.filename);
+      fileExists = fs.existsSync(defaultPath);
+    }
+    entry.fileExists = fileExists;
     
     return entry;
   });
@@ -254,19 +279,37 @@ function updateHistoryEntry(id, updates) {
 
 /**
  * Delete a history entry and its associated files
+ * Note: For local path imports (isLocalPath=true), only removes from history, doesn't delete the original file
  */
 function deleteHistoryEntry(id) {
   const outputDir = path.join(__dirname, '../../output');
   let deleted = false;
   
-  // Remove from history.json
+  // Get the entry first to check if it's a local path import
   const history = loadHistory();
+  const entry = history.find(item => item.id === id);
+  const isLocalPath = entry?.isLocalPath || false;
+  
+  // Remove from history.json
   const filtered = history.filter(item => item.id !== id);
   if (filtered.length < history.length) {
     saveHistory(filtered);
     deleted = true;
   }
   
+  // For local path imports, don't delete the original file, just remove from history
+  if (isLocalPath) {
+    console.log(`Removed local path import from history (file not deleted): ${entry?.filePath || id}`);
+    // Still delete metadata file
+    const metadataPath = path.join(outputDir, `${id}.metadata.json`);
+    if (fs.existsSync(metadataPath)) {
+      fs.unlinkSync(metadataPath);
+      console.log(`Deleted metadata file: ${metadataPath}`);
+    }
+    return deleted;
+  }
+  
+  // For uploaded files, delete the actual files
   // Also try to delete the metadata file
   const metadataPath = path.join(outputDir, `${id}.metadata.json`);
   if (fs.existsSync(metadataPath)) {
@@ -281,10 +324,18 @@ function deleteHistoryEntry(id) {
           deleted = true;
         }
       }
+      // Only delete outputPath if it's in the output directory (not a local path)
       if (metadata.outputPath && fs.existsSync(metadata.outputPath)) {
-        fs.unlinkSync(metadata.outputPath);
-        console.log(`Deleted audio file: ${metadata.outputPath}`);
-        deleted = true;
+        const outputPathNormalized = path.normalize(metadata.outputPath);
+        const outputDirNormalized = path.normalize(outputDir);
+        // Only delete if it's within the output directory
+        if (outputPathNormalized.startsWith(outputDirNormalized)) {
+          fs.unlinkSync(metadata.outputPath);
+          console.log(`Deleted audio file: ${metadata.outputPath}`);
+          deleted = true;
+        } else {
+          console.log(`Skipped deleting local path file: ${metadata.outputPath}`);
+        }
       }
     } catch (e) {
       console.warn('Error reading metadata for deletion:', e.message);

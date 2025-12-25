@@ -55,70 +55,71 @@ function History({ onSelectBook }) {
     }
   };
 
-  const handleImportAudiobook = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Reset the input so the same file can be selected again
-    event.target.value = '';
+  const handleImportAudiobook = async () => {
+    // Prompt for file path instead of file upload
+    const filePath = prompt(
+      'Enter the full path to your audio file:\n\n' +
+      'Example: /home/user/Music/mybook.mp3\n\n' +
+      'Supported formats: MP3, WAV, M4A, OGG, FLAC, AAC'
+    );
+    
+    if (!filePath || !filePath.trim()) {
+      return;
+    }
 
     setImporting(true);
     setImportProgress(0);
+    setError('');
 
     try {
-      const formData = new FormData();
-      formData.append('audioFile', file);
-      
-      // Extract title from filename (without extension)
-      const bookTitle = file.name.replace(/\.[^/.]+$/, '');
-      formData.append('bookTitle', bookTitle);
-
-      const xhr = new XMLHttpRequest();
-      
-      // Track upload progress
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const progress = Math.round((e.loaded / e.total) * 100);
-          setImportProgress(progress);
-        }
+      const response = await fetch(`${API_BASE_URL}/history/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: filePath.trim() }),
       });
 
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const response = JSON.parse(xhr.responseText);
-          console.log('Import successful:', response);
-          loadHistory(); // Refresh the library
-          setImporting(false);
-          setImportProgress(0);
-        } else {
-          const errorResponse = JSON.parse(xhr.responseText);
-          throw new Error(errorResponse.error || 'Import failed');
-        }
-      };
+      const result = await response.json();
 
-      xhr.onerror = () => {
-        setError('Network error during import');
-        setImporting(false);
-        setImportProgress(0);
-      };
-
-      xhr.open('POST', `${API_BASE_URL}/history/import`);
-      xhr.send(formData);
-
+      if (response.ok && result.success) {
+        console.log('Import successful:', result);
+        loadHistory(); // Refresh the library
+        setError('');
+      } else {
+        throw new Error(result.error || 'Import failed');
+      }
     } catch (err) {
       console.error('Error importing audiobook:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to import audiobook');
+    } finally {
       setImporting(false);
       setImportProgress(0);
     }
   };
 
-  const handleBookClick = (book) => {
-    const audioUrl = `/audio/${book.filename}`;
-    setSelectedBook({
-      ...book,
-      audioUrl,
-    });
+  const handleBookClick = async (book) => {
+    // Check if file exists before playing
+    try {
+      const response = await fetch(`${API_BASE_URL}/history/${book.id}/check-file`);
+      const result = await response.json();
+      
+      if (!result.exists) {
+        setError(`Audio file not found at: ${book.filePath || book.filename}\n\nThe file may have been moved or deleted.`);
+        return;
+      }
+      
+      // Use filePath if available (for imported files), otherwise use filename
+      const audioUrl = book.filePath 
+        ? `${API_BASE_URL}/history/${book.id}/file`
+        : `/audio/${book.filename}`;
+      
+      setSelectedBook({
+        ...book,
+        audioUrl,
+      });
+    } catch (err) {
+      console.error('Error checking file:', err);
+      setError('Failed to verify file existence. The file may have been moved or deleted.');
+    }
   };
 
   const handleDelete = async (id, e) => {
@@ -376,18 +377,10 @@ function History({ onSelectBook }) {
           Library
         </h2>
         <div className="history-actions">
-          {/* Hidden file input for import */}
-          <input
-            type="file"
-            id="import-audiobook-input"
-            accept=".mp3,.wav,.m4a,.ogg,.flac,.aac"
-            style={{ display: 'none' }}
-            onChange={handleImportAudiobook}
-          />
           <button 
-            onClick={() => document.getElementById('import-audiobook-input').click()} 
+            onClick={handleImportAudiobook} 
             className="import-btn" 
-            title="Import local audiobook"
+            title="Import local audiobook by file path"
             disabled={importing}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -395,7 +388,7 @@ function History({ onSelectBook }) {
               <polyline points="17 8 12 3 7 8"></polyline>
               <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
-            {importing ? `Importing ${importProgress}%` : 'Import'}
+            {importing ? 'Importing...' : 'Import'}
           </button>
           <button onClick={() => setShowNewFolder(true)} className="new-folder-btn" title="New Folder">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -562,7 +555,14 @@ function History({ onSelectBook }) {
                           autoFocus
                         />
                       ) : (
-                        <h3 className="history-item-title">{book.bookTitle}</h3>
+                        <h3 className="history-item-title">
+                          {book.bookTitle}
+                          {book.fileExists === false && (
+                            <span className="file-missing-badge" title={`File not found: ${book.filePath || book.filename}`}>
+                              ⚠️ File Missing
+                            </span>
+                          )}
+                        </h3>
                       )}
                       <div className="history-item-meta">
                         <span className="history-item-date">
@@ -571,6 +571,11 @@ function History({ onSelectBook }) {
                         {book.characterCount > 0 && (
                           <span className="history-item-chars">
                             {formatCharacterCount(book.characterCount)} chars
+                          </span>
+                        )}
+                        {book.isLocalPath && (
+                          <span className="local-path-badge" title="Local file path (not uploaded)">
+                            📁 Local
                           </span>
                         )}
                       </div>

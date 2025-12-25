@@ -121,46 +121,74 @@ router.delete('/', (req, res) => {
   }
 });
 
-// Import a local audio file to the library
-router.post('/import', audioUpload.single('audioFile'), (req, res) => {
+// Import a local audio file to the library by file path (no upload)
+router.post('/import', (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No audio file provided' });
+    const { filePath } = req.body;
+    
+    if (!filePath || !filePath.trim()) {
+      return res.status(400).json({ error: 'File path is required' });
     }
 
-    const bookTitle = req.body.bookTitle || path.basename(req.file.originalname, path.extname(req.file.originalname));
-    const jobId = `import_${Date.now()}`;
+    const normalizedPath = path.normalize(filePath.trim());
+    
+    // Check if file exists
+    if (!fs.existsSync(normalizedPath)) {
+      return res.status(404).json({ error: `File not found: ${normalizedPath}` });
+    }
 
-    // Create metadata for the imported file
+    // Check if it's a file (not a directory)
+    const stats = fs.statSync(normalizedPath);
+    if (!stats.isFile()) {
+      return res.status(400).json({ error: 'Path is not a file' });
+    }
+
+    // Validate file extension
+    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac'];
+    const ext = path.extname(normalizedPath).toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      return res.status(400).json({ 
+        error: `Unsupported file type. Allowed: ${allowedExtensions.join(', ')}` 
+      });
+    }
+
+    // Extract book title from filename
+    const bookTitle = req.body.bookTitle || path.basename(normalizedPath, ext);
+    const jobId = `import_${Date.now()}`;
+    const filename = path.basename(normalizedPath);
+
+    // Create metadata for the imported file (using original path, not copied)
     const entry = addToHistory({
       jobId: jobId,
       bookTitle: bookTitle,
-      filename: req.file.filename,
-      filePath: req.file.path,
+      filename: filename, // Just the filename for display
+      filePath: normalizedPath, // Full path to original file
       characterCount: 0,
       createdAt: new Date().toISOString(),
-      uploadedFilename: req.file.originalname,
+      uploadedFilename: filename,
       isImported: true, // Mark as imported (not generated)
+      isLocalPath: true, // Mark as local path (not uploaded to server)
     });
 
-    // Also create a metadata file for consistency
+    // Create a metadata file for consistency
     const metadataPath = path.join(outputDir, `${jobId}.metadata.json`);
     const metadata = {
       jobId: jobId,
-      filename: req.file.filename,
-      outputPath: req.file.path,
+      filename: filename,
+      outputPath: normalizedPath, // Store original path
       status: 'completed',
       createdAt: new Date().toISOString(),
       metadata: {
         bookTitle: bookTitle,
-        uploadedFilename: req.file.originalname,
+        uploadedFilename: filename,
         characterCount: 0,
         isImported: true,
+        isLocalPath: true,
       }
     };
     fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
 
-    console.log(`Imported audiobook: ${bookTitle} (${req.file.filename})`);
+    console.log(`Imported audiobook by path: ${bookTitle} (${normalizedPath})`);
     
     res.json({
       success: true,
@@ -169,10 +197,76 @@ router.post('/import', audioUpload.single('audioFile'), (req, res) => {
     });
   } catch (error) {
     console.error('Error importing audiobook:', error);
-    // Clean up uploaded file if import failed
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check if a file exists for a history entry
+router.get('/:id/check-file', (req, res) => {
+  try {
+    const { id } = req.params;
+    const entry = getHistoryEntry(id);
+    
+    if (!entry) {
+      return res.status(404).json({ error: 'History entry not found', exists: false });
     }
+
+    // Check if file exists at the stored path
+    const filePath = entry.filePath || path.join(outputDir, entry.filename);
+    const exists = fs.existsSync(filePath);
+    
+    res.json({ 
+      exists,
+      filePath: entry.filePath || null,
+      filename: entry.filename 
+    });
+  } catch (error) {
+    console.error('Error checking file:', error);
+    res.status(500).json({ error: error.message, exists: false });
+  }
+});
+
+// Serve the audio file from its original path (for imported files)
+router.get('/:id/file', (req, res) => {
+  try {
+    const { id } = req.params;
+    const entry = getHistoryEntry(id);
+    
+    if (!entry) {
+      return res.status(404).json({ error: 'History entry not found' });
+    }
+
+    // Use filePath if available (for imported files), otherwise use filename in output dir
+    const filePath = entry.filePath || path.join(outputDir, entry.filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ 
+        error: `Audio file not found: ${filePath}`,
+        message: 'The file may have been moved or deleted.'
+      });
+    }
+
+    // Determine content type based on extension
+    const ext = path.extname(filePath).toLowerCase();
+    const contentTypeMap = {
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.m4a': 'audio/mp4',
+      '.ogg': 'audio/ogg',
+      '.flac': 'audio/flac',
+      '.aac': 'audio/aac',
+    };
+    const contentType = contentTypeMap[ext] || 'audio/mpeg';
+
+    // Set headers and send file
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${path.basename(filePath)}"`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error('Error serving file:', error);
     res.status(500).json({ error: error.message });
   }
 });

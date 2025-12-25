@@ -390,6 +390,30 @@
   align-items: center;
 }
 
+.file-missing-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 12px;
+  font-size: 11px;
+  color: #fca5a5;
+  font-weight: 500;
+}
+
+.local-path-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: 12px;
+  font-size: 11px;
+  color: #93c5fd;
+  font-weight: 500;
+}
+
 .history-item-actions {
   display: flex;
   gap: 8px;
