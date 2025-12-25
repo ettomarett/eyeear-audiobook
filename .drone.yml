@@ -102,7 +102,7 @@ steps:
         # Health check
         echo "🏥 Running health check..."
         ssh $$DEPLOY_USER@$$DEPLOY_HOST \
-          "docker exec eyeear-backend node -e \"require('http').get('http://localhost:3003/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})\" || \
+          "docker exec eyeear-backend wget -q -O- http://localhost:3003/api/health || \
            curl -f http://localhost:3003/api/health || exit 1"
         
         echo "✅ Deployment complete!"

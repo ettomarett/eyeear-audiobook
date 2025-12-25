@@ -23,7 +23,8 @@ RUN apk add --no-cache \
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci --production
+# Skip postinstall script (electron-builder not needed in Docker)
+RUN npm ci --production --ignore-scripts
 
 # Copy backend
 COPY backend/ ./backend/
