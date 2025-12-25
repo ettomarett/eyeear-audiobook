@@ -10,7 +10,7 @@ import Recovery from './components/Recovery';
 import RunningJobs from './components/RunningJobs';
 import './App.css';
 
-const API_BASE_URL = 'http://localhost:3003/api';
+const API_BASE_URL = '/api';
 
 function App() {
   const [currentView, setCurrentView] = useState('upload'); // 'upload' or 'history'

@@ -1,0 +1,54 @@
+# Traefik dynamic configuration for EyeEar Audiobook Generator
+# Place this file in Traefik's dynamic configuration directory
+# Typically: /etc/traefik/dynamic/eyeear.yml or /etc/traefik/dynamic/eyeear.yaml
+#
+# Note: The backend serves both API and static frontend files
+# Frontend files are served from the backend's static middleware
+
+http:
+  routers:
+    eyeear-http:
+      rule: "Host(`eyeear.clueleak.com`)"
+      entryPoints:
+        - web
+      middlewares:
+        - eyeear-redirect
+      service: eyeear-backend
+
+    eyeear-https:
+      rule: "Host(`eyeear.clueleak.com`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - eyeear-headers
+      service: eyeear-backend
+      tls:
+        certResolver: letsencrypt
+
+  middlewares:
+    eyeear-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    eyeear-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          X-Frame-Options: "SAMEORIGIN"
+          X-Content-Type-Options: "nosniff"
+          X-XSS-Protection: "1; mode=block"
+          Access-Control-Allow-Origin: "*"
+
+  services:
+    eyeear-backend:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3003"
+        healthCheck:
+          path: "/api/health"
+          interval: "30s"
+          timeout: "10s"
+          scheme: "http"
+

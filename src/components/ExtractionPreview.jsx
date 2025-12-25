@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './ExtractionPreview.css';
 
-const API_BASE_URL = 'http://localhost:3003/api';
+const API_BASE_URL = '/api';
 
 // Voice pricing per character (in USD) - matches backend
 const VOICE_PRICING = {

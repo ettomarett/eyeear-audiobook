@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Settings.css';
 
-const API_BASE_URL = 'http://localhost:3003/api';
+const API_BASE_URL = '/api';
 
 // Complete voice options from Google Cloud TTS
 const VOICE_OPTIONS = [
