@@ -308,7 +308,7 @@ router.get('/:id/file', (req, res) => {
 // Import a local audio file using File System Access API (file handle stored in browser)
 router.post('/import-handle', (req, res) => {
   try {
-    const { bookId, fileName, bookTitle, fileSize, fileType } = req.body;
+    const { bookId, handleKey, fileName, bookTitle, fileSize, fileType } = req.body;
     
     if (!bookId || !fileName) {
       return res.status(400).json({ error: 'Book ID and file name are required' });
@@ -317,6 +317,7 @@ router.post('/import-handle', (req, res) => {
     // Extract book title from filename if not provided
     const finalBookTitle = bookTitle || path.basename(fileName, path.extname(fileName));
     const ext = path.extname(fileName).toLowerCase();
+    const finalHandleKey = handleKey || bookId; // Use provided handleKey or fallback to bookId
 
     // Create metadata for the imported file (file handle is stored in browser's IndexedDB)
     const entry = addToHistory({
@@ -332,6 +333,7 @@ router.post('/import-handle', (req, res) => {
       isFileHandle: true, // Mark as file handle import
       fileSize: fileSize || 0,
       fileType: fileType || `audio/${ext.slice(1)}`,
+      handleKey: finalHandleKey, // Store handleKey for frontend lookup
     });
 
     // Create a metadata file for consistency
@@ -351,6 +353,7 @@ router.post('/import-handle', (req, res) => {
         isFileHandle: true,
         fileSize: fileSize || 0,
         fileType: fileType || `audio/${ext.slice(1)}`,
+        handleKey: finalHandleKey, // Store handleKey in metadata
       }
     };
     fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));

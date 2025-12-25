@@ -60,6 +60,7 @@ function addToHistory(metadata) {
     isFileHandle: metadata.isFileHandle || false,
     fileSize: metadata.fileSize || null,
     fileType: metadata.fileType || null,
+    handleKey: metadata.handleKey || null, // Store handleKey for IndexedDB lookup
   };
 
   // Check if entry already exists (by id) and update it, otherwise add new
@@ -156,6 +157,25 @@ function getHistory() {
         }
       }
       
+      // Determine storage mode and set appropriate fields
+      let storageMode = 'SERVER';
+      let audioUrl = null;
+      let handleKey = null;
+      
+      if (isFileHandle) {
+        storageMode = 'LOCAL_FS';
+        handleKey = entry.id; // Use book ID as handle key
+        // DO NOT set audioUrl for local files - frontend will create blob URL
+      } else if (isLocalPath) {
+        storageMode = 'LOCAL_PATH';
+        // For Electron/local path imports, we can serve from the path
+        audioUrl = filePath ? `/api/history/${entry.id}/file` : null;
+      } else {
+        storageMode = 'SERVER';
+        // Server files can have audioUrl
+        audioUrl = entry.filename ? `/audio/${entry.filename}` : null;
+      }
+      
       // Update entry with metadata from file (prefer metadata file over history.json)
       return {
         ...entry,
@@ -167,7 +187,10 @@ function getHistory() {
         isImported: metadata.metadata.isImported || entry.isImported || false,
         isLocalPath: metadata.metadata.isLocalPath || entry.isLocalPath || false,
         isFileHandle: isFileHandle,
-        fileExists: fileExists, // Add file existence status
+        fileExists: fileExists,
+        storageMode: storageMode, // NEW: explicit storage mode
+        handleKey: handleKey, // NEW: key for IndexedDB lookup
+        audioUrl: audioUrl, // NEW: only set for server/local-path files, null for file handles
       };
     }
     
@@ -184,26 +207,53 @@ function getHistory() {
     // Check if file exists for entries without metadata
     // Skip check for file handle imports (stored in browser's IndexedDB)
     let fileExists = true;
+    let storageMode = 'SERVER';
+    let audioUrl = null;
+    let handleKey = null;
+    
     if (entry.isFileHandle) {
       // File handle imports are stored in browser's IndexedDB, not on server
+      storageMode = 'LOCAL_FS';
+      handleKey = entry.id;
       fileExists = true; // Assume exists, frontend will check IndexedDB
-    } else if (entry.filePath) {
+      // DO NOT set audioUrl
+    } else if (entry.isLocalPath && entry.filePath) {
+      storageMode = 'LOCAL_PATH';
+      handleKey = null;
       try {
         fileExists = fs.existsSync(entry.filePath);
+        audioUrl = fileExists ? `/api/history/${entry.id}/file` : null;
       } catch (err) {
         console.warn(`Error checking file existence for ${entry.filePath}:`, err);
         fileExists = false;
+        audioUrl = null;
       }
-    } else if (entry.filename) {
-      try {
-        const defaultPath = path.join(outputDir, entry.filename);
-        fileExists = fs.existsSync(defaultPath);
-      } catch (err) {
-        console.warn(`Error checking file existence for ${entry.filename}:`, err);
-        fileExists = false;
+    } else {
+      storageMode = 'SERVER';
+      handleKey = null;
+      if (entry.filePath) {
+        try {
+          fileExists = fs.existsSync(entry.filePath);
+        } catch (err) {
+          console.warn(`Error checking file existence for ${entry.filePath}:`, err);
+          fileExists = false;
+        }
+      } else if (entry.filename) {
+        try {
+          const defaultPath = path.join(outputDir, entry.filename);
+          fileExists = fs.existsSync(defaultPath);
+        } catch (err) {
+          console.warn(`Error checking file existence for ${entry.filename}:`, err);
+          fileExists = false;
+        }
       }
+      audioUrl = entry.filename ? `/audio/${entry.filename}` : null;
     }
+    
     entry.fileExists = fileExists;
+    entry.storageMode = storageMode;
+    entry.handleKey = handleKey;
+    entry.audioUrl = audioUrl;
     
     return entry;
   });

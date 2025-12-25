@@ -38,7 +38,7 @@ function History({ onSelectBook }) {
   }, [selectedBook]);
 
   // Check if file handle exists in IndexedDB
-  const checkFileHandleExists = async (bookId) => {
+  const checkFileHandleExists = async (handleKey) => {
     try {
       if (!('indexedDB' in window)) {
         return false;
@@ -65,7 +65,7 @@ function History({ onSelectBook }) {
 
       const transaction = db.transaction(['handles'], 'readonly');
       const store = transaction.objectStore('handles');
-      const request = store.get(bookId);
+      const request = store.get(handleKey);
       
       return new Promise((resolve, reject) => {
         request.onsuccess = () => {
@@ -114,23 +114,37 @@ function History({ onSelectBook }) {
       let enrichedData;
       try {
         enrichedData = await Promise.allSettled(data.map(async (book) => {
-          if (book.isFileHandle) {
+          // Only check file handles for LOCAL_FS books
+          if (book.storageMode === 'LOCAL_FS' || isLikelyFileHandleBook(book)) {
             try {
-              const handleExists = await checkFileHandleExists(book.id);
+              const handleKey = getHandleKeyForBook(book);
+              const handleExists = await checkFileHandleExists(handleKey);
+              
+              let fileStatus = 'OK';
+              if (!handleExists) {
+                fileStatus = 'MISSING_HANDLE';
+              }
+              
               return {
                 ...book,
-                fileExists: handleExists, // Update fileExists based on IndexedDB check
+                fileExists: handleExists,
+                fileStatus: fileStatus,
               };
             } catch (err) {
-              // If IndexedDB check fails, assume file doesn't exist but don't break the load
+              // If IndexedDB check fails, mark as error but don't break the load
               console.warn(`Failed to check file handle for book ${book.id}:`, err);
               return {
                 ...book,
-                fileExists: false, // Mark as missing if we can't check
+                fileExists: false,
+                fileStatus: 'ERROR',
               };
             }
           }
-          return book;
+          // Server books are OK by default (backend already checked)
+          return {
+            ...book,
+            fileStatus: book.fileExists !== false ? 'OK' : 'MISSING',
+          };
         }));
         
         // Extract values from Promise.allSettled results
@@ -145,8 +159,8 @@ function History({ onSelectBook }) {
         }).filter(book => book !== null); // Remove any null entries
       } catch (err) {
         console.error('Error enriching history data:', err);
-        // If enrichment fails, just use the original data
-        enrichedData = data;
+        // If enrichment fails, just use the original data with default status
+        enrichedData = data.map(book => ({ ...book, fileStatus: 'OK' }));
       }
       
       setHistory(enrichedData);
@@ -174,7 +188,7 @@ function History({ onSelectBook }) {
   };
 
   // Store file handles in IndexedDB for File System Access API
-  const storeFileHandle = async (fileHandle, bookId) => {
+  const storeFileHandle = async (fileHandle, handleKey) => {
     try {
       if (!('indexedDB' in window)) {
         console.warn('IndexedDB not available');
@@ -195,7 +209,8 @@ function History({ onSelectBook }) {
 
       const transaction = db.transaction(['handles'], 'readwrite');
       const store = transaction.objectStore('handles');
-      await store.put({ bookId, fileHandle, fileName: fileHandle.name });
+      // Use handleKey as bookId for storage (must match what we use to retrieve)
+      await store.put({ bookId: handleKey, fileHandle, fileName: fileHandle.name });
       return true;
     } catch (err) {
       console.error('Error storing file handle:', err);
@@ -225,9 +240,10 @@ function History({ onSelectBook }) {
         const file = await fileHandle.getFile();
         const bookTitle = file.name.replace(/\.[^/.]+$/, '');
         const jobId = `import_${Date.now()}`;
+        const handleKey = jobId; // Use jobId as handleKey
 
         // Store file handle in IndexedDB for later access
-        await storeFileHandle(fileHandle, jobId);
+        await storeFileHandle(fileHandle, handleKey);
 
         // Import using file handle approach
         const response = await fetch(`${API_BASE_URL}/history/import-handle`, {
@@ -235,6 +251,7 @@ function History({ onSelectBook }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             bookId: jobId,
+            handleKey: handleKey, // Send handleKey to backend
             fileName: file.name,
             bookTitle: bookTitle,
             fileSize: file.size,
@@ -336,7 +353,7 @@ function History({ onSelectBook }) {
   };
 
   // Retrieve file handle from IndexedDB
-  const getFileHandle = async (bookId) => {
+  const getFileHandleFromIndexedDB = async (handleKey) => {
     try {
       if (!('indexedDB' in window)) {
         return null;
@@ -356,7 +373,7 @@ function History({ onSelectBook }) {
 
       const transaction = db.transaction(['handles'], 'readonly');
       const store = transaction.objectStore('handles');
-      const request = store.get(bookId);
+      const request = store.get(handleKey);
       
       return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve(request.result?.fileHandle || null);
@@ -368,62 +385,117 @@ function History({ onSelectBook }) {
     }
   };
 
+  // Helper: Check if book is likely a file handle import
+  const isLikelyFileHandleBook = (book) => {
+    return Boolean(
+      book?.isFileHandle ||
+      book?.storageMode === 'LOCAL_FS' ||
+      book?.handleKey ||
+      book?.importMethod === 'file_handle' ||
+      book?.importType === 'FILE_HANDLE'
+    );
+  };
+
+  // Helper: Get handle key for book
+  const getHandleKeyForBook = (book) => {
+    return book?.handleKey || book?.fileHandleKey || book?.id;
+  };
+
   const handleBookClick = async (book) => {
-    // Check if this is a file handle import (stored in IndexedDB)
-    if (book.isFileHandle) {
-      const fileHandle = await getFileHandle(book.id);
-      
-      if (!fileHandle) {
-        setError('File handle not found. You may need to re-import the file using the File System Access API.');
-        return;
+    try {
+      // Cleanup previous blob URL (IMPORTANT: do NOT revoke the new one too early)
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
       }
-      
-      // Use File System Access API to read the file
-      try {
-        // Cleanup previous blob URL if exists
-        if (blobUrlRef.current) {
-          URL.revokeObjectURL(blobUrlRef.current);
+
+      // 1) LOCAL FILE HANDLE PATH (authoritative if likely local)
+      if (isLikelyFileHandleBook(book)) {
+        const handleKey = getHandleKeyForBook(book);
+        const handle = await getFileHandleFromIndexedDB(handleKey);
+
+        if (!handle) {
+          // IMPORTANT: don't fall through to server URL.
+          setSelectedBook({
+            ...book,
+            audioUrl: null,
+            isFileHandle: true,
+            fileStatus: 'MISSING_HANDLE', // render "Re-import / Relink"
+          });
+          setError('File handle not found. Please re-import the file using the File System Access API.');
+          return;
         }
-        
-        const file = await fileHandle.getFile();
+
+        // Permission check (best practice)
+        if (handle.queryPermission && handle.requestPermission) {
+          const perm = await handle.queryPermission({ mode: 'read' });
+          if (perm !== 'granted') {
+            const req = await handle.requestPermission({ mode: 'read' });
+            if (req !== 'granted') {
+              setSelectedBook({
+                ...book,
+                audioUrl: null,
+                isFileHandle: true,
+                fileStatus: 'NEEDS_PERMISSION', // render "Grant permission"
+              });
+              setError('Permission denied. Please grant file access permission.');
+              return;
+            }
+          }
+        }
+
+        const file = await handle.getFile();
         const audioUrl = URL.createObjectURL(file);
-        blobUrlRef.current = audioUrl; // Store for cleanup
-        
+        blobUrlRef.current = audioUrl;
+
         setSelectedBook({
           ...book,
-          audioUrl,
-          isFileHandle: true, // Mark as file handle so we can revoke URL later
+          audioUrl,          // ✅ blob: URL
+          isFileHandle: true,
+          fileStatus: 'OK',
+          handleKey,         // keep for recovery UI
         });
-        return;
-      } catch (err) {
-        console.error('Error reading file from handle:', err);
-        setError('Failed to access file. The file may have been moved or deleted. Please re-import the file.');
-        return;
-      }
-    }
 
-    // Fallback to regular file path check (for server-side files)
-    try {
-      const response = await fetch(`${API_BASE_URL}/history/${book.id}/check-file`);
-      const result = await response.json();
-      
-      if (!result.exists) {
-        setError(`Audio file not found at: ${book.filePath || book.filename}\n\nThe file may have been moved or deleted.`);
-        return;
+        setError(null); // Clear any previous errors
+        return; // ✅ stop here, NEVER fall into server URL logic
       }
-      
-      // Use filePath if available (for imported files), otherwise use filename
-      const audioUrl = book.filePath 
-        ? `${API_BASE_URL}/history/${book.id}/file`
-        : `/audio/${book.filename}`;
-      
+
+      // 2) SERVER PATH (only for truly server-backed books)
+      // If you have book.audioUrl from API, prefer it. Otherwise use a single endpoint.
+      const audioUrl = book.audioUrl || `${API_BASE_URL}/history/${book.id}/file`;
+
       setSelectedBook({
         ...book,
-        audioUrl,
+        audioUrl,          // ✅ network URL only for server books
+        isFileHandle: false,
+        fileStatus: 'OK',
       });
+      setError(null); // Clear any previous errors
     } catch (err) {
-      console.error('Error checking file:', err);
-      setError('Failed to verify file existence. The file may have been moved or deleted.');
+      console.error('handleBookClick failed:', err);
+
+      // If it was *supposed* to be local, keep it local and show error.
+      if (isLikelyFileHandleBook(book)) {
+        setSelectedBook({
+          ...book,
+          audioUrl: null,
+          isFileHandle: true,
+          fileStatus: 'ERROR_LOCAL',
+          fileError: String(err?.message || err),
+        });
+        setError(`Failed to access local file: ${err?.message || err}`);
+        return;
+      }
+
+      // Otherwise show server error
+      setSelectedBook({
+        ...book,
+        audioUrl: null,
+        isFileHandle: false,
+        fileStatus: 'ERROR_SERVER',
+        fileError: String(err?.message || err),
+      });
+      setError(`Failed to access server file: ${err?.message || err}`);
     }
   };
 

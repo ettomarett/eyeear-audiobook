@@ -86,7 +86,10 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
   };
 
   useEffect(() => {
-    if (!audioUrl) return;
+    if (!audioUrl) {
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     setLoadError(null);
@@ -94,6 +97,15 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
     // Clean up previous sound
     if (soundRef.current) {
       soundRef.current.unload();
+      soundRef.current = null;
+    }
+
+    // Validate URL - blob URLs should start with 'blob:', server URLs should start with 'http' or '/'
+    if (!audioUrl.startsWith('blob:') && !audioUrl.startsWith('http') && !audioUrl.startsWith('/')) {
+      console.error('Invalid audio URL:', audioUrl);
+      setLoadError('Invalid audio URL format');
+      setIsLoading(false);
+      return;
     }
 
     const sound = new Howl({
