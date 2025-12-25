@@ -76,7 +76,7 @@ steps:
           $$DEPLOY_USER@$$DEPLOY_HOST:$$DEPLOY_PATH/build/dist/
         
         # Build image and deploy
-        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH/build && docker build -t eyeear-audiobook:latest . && cd $$DEPLOY_PATH && docker-compose down 2>/dev/null || true"
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH/build && docker build -t eyeear-audiobook:latest . && cd $$DEPLOY_PATH && (docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true)"
         
         # Deploy docker-compose.yml
         echo "📦 Deploying docker-compose.yml..."
@@ -84,9 +84,9 @@ steps:
           docker-compose.yml \
           $$DEPLOY_USER@$$DEPLOY_HOST:$$DEPLOY_PATH/
         
-        # Start container
+        # Start container (try docker compose v2 first, fallback to docker-compose v1)
         echo "📦 Starting Docker container..."
-        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && docker-compose up -d && docker-compose ps"
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && (docker compose up -d && docker compose ps) || (docker-compose up -d && docker-compose ps)"
         
         # Wait for service to be ready
         echo "⏳ Waiting for backend to be ready..."
