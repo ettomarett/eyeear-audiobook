@@ -130,11 +130,32 @@ router.post('/import', (req, res) => {
       return res.status(400).json({ error: 'File path is required' });
     }
 
-    const normalizedPath = path.normalize(filePath.trim());
+    // Normalize the path - handle both Windows and Unix paths
+    let normalizedPath = filePath.trim();
+    
+    // Replace backslashes with forward slashes for cross-platform compatibility
+    normalizedPath = normalizedPath.replace(/\\/g, '/');
+    
+    // Remove any leading/trailing whitespace and normalize
+    normalizedPath = path.normalize(normalizedPath);
+    
+    // Resolve relative paths to absolute (if needed)
+    if (!path.isAbsolute(normalizedPath)) {
+      // If it's a relative path, try to resolve it from common locations
+      // But for now, we'll require absolute paths
+      return res.status(400).json({ 
+        error: `File path must be absolute. Received: ${filePath}` 
+      });
+    }
+    
+    console.log(`Checking file existence: ${normalizedPath}`);
     
     // Check if file exists
     if (!fs.existsSync(normalizedPath)) {
-      return res.status(404).json({ error: `File not found: ${normalizedPath}` });
+      return res.status(404).json({ 
+        error: `File not found: ${normalizedPath}`,
+        message: 'The file may have been moved, deleted, or the path is incorrect. Please verify the file exists and try again.'
+      });
     }
 
     // Check if it's a file (not a directory)

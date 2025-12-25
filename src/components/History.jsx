@@ -55,27 +55,51 @@ function History({ onSelectBook }) {
     }
   };
 
-  const handleImportAudiobook = async () => {
-    // Prompt for file path instead of file upload
-    const filePath = prompt(
-      'Enter the full path to your audio file:\n\n' +
-      'Example: /home/user/Music/mybook.mp3\n\n' +
-      'Supported formats: MP3, WAV, M4A, OGG, FLAC, AAC'
-    );
-    
-    if (!filePath || !filePath.trim()) {
+  const handleImportAudiobook = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      // Reset the input so the same file can be selected again
+      event.target.value = '';
       return;
     }
+
+    // Reset the input so the same file can be selected again
+    event.target.value = '';
 
     setImporting(true);
     setImportProgress(0);
     setError('');
 
     try {
+      // In Electron, file objects have a 'path' property with the full file path
+      // In regular browsers, this property doesn't exist for security reasons
+      let filePath = file.path;
+      
+      // Check if path is a fake path (browsers use "C:\fakepath\filename" to hide real paths)
+      if (filePath && (filePath.includes('fakepath') || filePath.startsWith('C:\\fakepath'))) {
+        filePath = null;
+      }
+      
+      if (!filePath) {
+        // Try webkitRelativePath as fallback (for directory uploads)
+        filePath = file.webkitRelativePath || null;
+      }
+      
+      if (!filePath) {
+        // Fallback: try to construct a path or use the file name
+        // This won't work for local file access in browsers, but might work in Electron
+        throw new Error('Could not determine file path. Please ensure you are using the Electron desktop app. The file path is not accessible in web browsers for security reasons.');
+      }
+
+      console.log('Importing file with path:', filePath);
+
       const response = await fetch(`${API_BASE_URL}/history/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: filePath.trim() }),
+        body: JSON.stringify({ 
+          filePath: filePath,
+          fileName: file.name // Also send the filename for reference
+        }),
       });
 
       const result = await response.json();
@@ -377,10 +401,18 @@ function History({ onSelectBook }) {
           Library
         </h2>
         <div className="history-actions">
+          {/* Hidden file input for import */}
+          <input
+            type="file"
+            id="import-audiobook-input"
+            accept=".mp3,.wav,.m4a,.ogg,.flac,.aac"
+            style={{ display: 'none' }}
+            onChange={handleImportAudiobook}
+          />
           <button 
-            onClick={handleImportAudiobook} 
+            onClick={() => document.getElementById('import-audiobook-input').click()} 
             className="import-btn" 
-            title="Import local audiobook by file path"
+            title="Import local audiobook"
             disabled={importing}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
