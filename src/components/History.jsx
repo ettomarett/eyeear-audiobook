@@ -86,39 +86,76 @@ function History({ onSelectBook }) {
   const loadHistory = async () => {
     try {
       setLoading(true);
+      setError(null); // Clear any previous errors
+      
       const response = await fetch(`${API_BASE_URL}/history`);
       if (!response.ok) {
-        throw new Error('Failed to load library');
+        const errorText = await response.text();
+        let errorMessage = 'Failed to load library';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
-      const data = await response.json();
+      
+      let data;
+      try {
+        data = await response.json();
+      } catch (err) {
+        console.error('Error parsing response:', err);
+        throw new Error('Invalid response from server');
+      }
       
       // For file handle imports, check if the handle exists in IndexedDB
       // Wrap in try-catch to prevent IndexedDB errors from breaking the entire load
-      const enrichedData = await Promise.all(data.map(async (book) => {
-        if (book.isFileHandle) {
-          try {
-            const handleExists = await checkFileHandleExists(book.id);
-            return {
-              ...book,
-              fileExists: handleExists, // Update fileExists based on IndexedDB check
-            };
-          } catch (err) {
-            // If IndexedDB check fails, assume file doesn't exist but don't break the load
-            console.warn(`Failed to check file handle for book ${book.id}:`, err);
-            return {
-              ...book,
-              fileExists: false, // Mark as missing if we can't check
-            };
+      let enrichedData;
+      try {
+        enrichedData = await Promise.allSettled(data.map(async (book) => {
+          if (book.isFileHandle) {
+            try {
+              const handleExists = await checkFileHandleExists(book.id);
+              return {
+                ...book,
+                fileExists: handleExists, // Update fileExists based on IndexedDB check
+              };
+            } catch (err) {
+              // If IndexedDB check fails, assume file doesn't exist but don't break the load
+              console.warn(`Failed to check file handle for book ${book.id}:`, err);
+              return {
+                ...book,
+                fileExists: false, // Mark as missing if we can't check
+              };
+            }
           }
-        }
-        return book;
-      }));
+          return book;
+        }));
+        
+        // Extract values from Promise.allSettled results
+        enrichedData = enrichedData.map(result => {
+          if (result.status === 'fulfilled') {
+            return result.value;
+          } else {
+            console.warn('Error processing book:', result.reason);
+            // Return a placeholder or the original book if processing failed
+            return result.reason?.book || null;
+          }
+        }).filter(book => book !== null); // Remove any null entries
+      } catch (err) {
+        console.error('Error enriching history data:', err);
+        // If enrichment fails, just use the original data
+        enrichedData = data;
+      }
       
       setHistory(enrichedData);
       setError(null);
     } catch (err) {
       console.error('Error loading library:', err);
-      setError('Failed to load library. Please try again.');
+      // Don't show the full error message if it contains sensitive info
+      const errorMessage = err.message || 'Failed to load library';
+      setError(`Error loading library: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

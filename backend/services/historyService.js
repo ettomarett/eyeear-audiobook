@@ -138,10 +138,22 @@ function getHistory() {
         // The frontend will check IndexedDB for the actual file handle
         fileExists = true;
       } else if (filePath) {
-        fileExists = fs.existsSync(filePath);
+        try {
+          fileExists = fs.existsSync(filePath);
+        } catch (err) {
+          // If we can't check file existence, assume it doesn't exist
+          console.warn(`Error checking file existence for ${filePath}:`, err);
+          fileExists = false;
+        }
       } else if (entry.filename) {
-        const defaultPath = path.join(outputDir, entry.filename);
-        fileExists = fs.existsSync(defaultPath);
+        try {
+          const defaultPath = path.join(outputDir, entry.filename);
+          fileExists = fs.existsSync(defaultPath);
+        } catch (err) {
+          // If we can't check file existence, assume it doesn't exist
+          console.warn(`Error checking file existence for ${entry.filename}:`, err);
+          fileExists = false;
+        }
       }
       
       // Update entry with metadata from file (prefer metadata file over history.json)
@@ -176,10 +188,20 @@ function getHistory() {
       // File handle imports are stored in browser's IndexedDB, not on server
       fileExists = true; // Assume exists, frontend will check IndexedDB
     } else if (entry.filePath) {
-      fileExists = fs.existsSync(entry.filePath);
+      try {
+        fileExists = fs.existsSync(entry.filePath);
+      } catch (err) {
+        console.warn(`Error checking file existence for ${entry.filePath}:`, err);
+        fileExists = false;
+      }
     } else if (entry.filename) {
-      const defaultPath = path.join(outputDir, entry.filename);
-      fileExists = fs.existsSync(defaultPath);
+      try {
+        const defaultPath = path.join(outputDir, entry.filename);
+        fileExists = fs.existsSync(defaultPath);
+      } catch (err) {
+        console.warn(`Error checking file existence for ${entry.filename}:`, err);
+        fileExists = false;
+      }
     }
     entry.fileExists = fileExists;
     
