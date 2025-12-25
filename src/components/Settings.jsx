@@ -319,6 +319,7 @@ function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [importingCreds, setImportingCreds] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [testingConnection, setTestingConnection] = useState(false);
 
@@ -368,33 +369,36 @@ function Settings() {
     }
   };
 
-  const resetToDefaults = async () => {
-    if (!window.confirm('Reset all settings to defaults? This will restore the original configuration.')) {
+  const importOmarsCreds = async () => {
+    const password = prompt('Enter password to import Omar\'s credentials:');
+    if (!password) {
       return;
     }
     
     try {
-      setResetting(true);
+      setImportingCreds(true);
       setMessage({ type: '', text: '' });
 
-      const response = await fetch(`${API_BASE_URL}/settings/reset`, {
+      const response = await fetch(`${API_BASE_URL}/settings/import-omars-creds`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
       });
 
       if (response.ok) {
         const data = await response.json();
         setSettings(data.settings);
-        setMessage({ type: 'success', text: 'Settings reset to defaults!' });
+        setMessage({ type: 'success', text: 'Omar\'s credentials imported successfully!' });
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
       } else {
         const error = await response.json();
-        setMessage({ type: 'error', text: error.error || 'Failed to reset settings' });
+        setMessage({ type: 'error', text: error.error || 'Failed to import credentials' });
       }
     } catch (err) {
-      console.error('Failed to reset settings:', err);
-      setMessage({ type: 'error', text: 'Failed to reset settings: ' + err.message });
+      console.error('Failed to import credentials:', err);
+      setMessage({ type: 'error', text: 'Failed to import credentials: ' + err.message });
     } finally {
-      setResetting(false);
+      setImportingCreds(false);
     }
   };
 
@@ -708,17 +712,17 @@ function Settings() {
       <div className="settings-actions">
         <button
           className="reset-btn"
-          onClick={resetToDefaults}
-          disabled={resetting}
+          onClick={importOmarsCreds}
+          disabled={importingCreds}
         >
-          {resetting ? 'Resetting...' : (
+          {importingCreds ? 'Importing...' : (
             <>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <polyline points="1 20 1 14 7 14"></polyline>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
-              Reset to Defaults
+              Import Omar's Creds
             </>
           )}
         </button>

@@ -1,4 +1,6 @@
 const express = require('express');
+const crypto = require('crypto');
+const fs = require('fs');
 const router = express.Router();
 const settingsService = require('../services/settingsService');
 
@@ -69,6 +71,52 @@ router.post('/reset', (req, res) => {
   } catch (err) {
     console.error('Error resetting settings:', err);
     res.status(500).json({ error: 'Failed to reset settings: ' + err.message });
+  }
+});
+
+// POST /api/settings/import-omars-creds - Import Omar's default credentials
+router.post('/import-omars-creds', (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+    
+    // Verify password (using SHA256 hash)
+    // You can set an environment variable OMARS_CREDS_PASSWORD or use default
+    const expectedPassword = process.env.OMARS_CREDS_PASSWORD || 'omarscreds2024';
+    const providedHash = crypto.createHash('sha256').update(password).digest('hex');
+    const expectedHash = crypto.createHash('sha256').update(expectedPassword).digest('hex');
+    
+    if (providedHash !== expectedHash) {
+      return res.status(401).json({ error: 'Invalid password' });
+    }
+    
+    // Import Omar's default credentials
+    // On VPS/Docker, the path should be /app/data/google_credentials.json
+    // On local, it should be /home/ettomar/.eyeear/google_credentials.json
+    const isDocker = process.env.NODE_ENV === 'production' || fs.existsSync('/app/data');
+    const credentialsPath = isDocker 
+      ? '/app/data/google_credentials.json'
+      : '/home/ettomar/.eyeear/google_credentials.json';
+    
+    const omarsSettings = {
+      googleCredentialsPath: credentialsPath,
+      gcsBucketName: 'eyeear-ettomarett-app-bucket',
+      gcsLocation: 'us-east1',
+      googleCloudProject: 'absolute-garden-428804-e8',
+      voiceName: 'en-US-Chirp3-HD-Iapetus',
+      languageCode: 'en-US',
+      speakingRate: 1.0,
+      pitch: 0.0,
+    };
+    
+    settingsService.saveSettings(omarsSettings);
+    res.json({ success: true, message: 'Omar\'s credentials imported successfully', settings: omarsSettings });
+  } catch (err) {
+    console.error('Error importing Omar\'s credentials:', err);
+    res.status(500).json({ error: 'Failed to import credentials: ' + err.message });
   }
 });
 
