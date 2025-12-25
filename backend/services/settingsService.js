@@ -130,6 +130,18 @@ function initializeSettings() {
 
 // Test connection with Google Cloud
 async function testConnection(settings) {
+  const result = {
+    success: false,
+    projectId: null,
+    ttsApiEnabled: false,
+    storageApiEnabled: false,
+    billingEnabled: null, // null = unknown, true = enabled, false = disabled
+    bucketAccessible: false,
+    voicesAvailable: 0,
+    warnings: [],
+    errors: [],
+  };
+
   try {
     // Temporarily apply settings for testing
     const originalEnv = {
@@ -143,11 +155,13 @@ async function testConnection(settings) {
     
     // Check if credentials file exists
     if (!settings.googleCredentialsPath) {
-      throw new Error('Google credentials path is required');
+      result.errors.push('Google credentials path is required');
+      return result;
     }
     
     if (!fs.existsSync(settings.googleCredentialsPath)) {
-      throw new Error(`Credentials file not found: ${settings.googleCredentialsPath}`);
+      result.errors.push(`Credentials file not found: ${settings.googleCredentialsPath}`);
+      return result;
     }
     
     // Try to read and parse the credentials file
@@ -155,21 +169,107 @@ async function testConnection(settings) {
     const credentials = JSON.parse(credsContent);
     
     if (!credentials.project_id) {
-      throw new Error('Invalid credentials file: missing project_id');
+      result.errors.push('Invalid credentials file: missing project_id');
+      return result;
     }
     
-    // Try to initialize TTS client
-    const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
-    const client = new TextToSpeechClient({
-      keyFilename: settings.googleCredentialsPath,
-    });
+    result.projectId = credentials.project_id;
     
-    // List voices to verify connection
-    const [result] = await client.listVoices({ languageCode: 'en-US' });
-    
-    if (!result.voices || result.voices.length === 0) {
-      throw new Error('No voices available - API may not be enabled');
+    // Test TTS API
+    try {
+      const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+      const ttsClient = new TextToSpeechClient({
+        keyFilename: settings.googleCredentialsPath,
+      });
+      
+      const [ttsResult] = await ttsClient.listVoices({ languageCode: 'en-US' });
+      
+      if (ttsResult.voices && ttsResult.voices.length > 0) {
+        result.ttsApiEnabled = true;
+        result.voicesAvailable = ttsResult.voices.length;
+      } else {
+        result.warnings.push('TTS API connected but no voices found');
+      }
+    } catch (ttsError) {
+      result.errors.push(`TTS API: ${ttsError.message}`);
+      if (ttsError.message.includes('API not enabled') || ttsError.message.includes('not enabled')) {
+        result.warnings.push('Text-to-Speech API may not be enabled. Enable it in Google Cloud Console.');
+      }
     }
+    
+    // Test Storage API
+    try {
+      const { Storage } = require('@google-cloud/storage');
+      const storage = new Storage({
+        keyFilename: settings.googleCredentialsPath,
+      });
+      
+      if (settings.gcsBucketName) {
+        const bucket = storage.bucket(settings.gcsBucketName);
+        try {
+          const [files] = await bucket.getFiles({ maxResults: 1 });
+          result.storageApiEnabled = true;
+          result.bucketAccessible = true;
+        } catch (bucketError) {
+          result.storageApiEnabled = true; // API is enabled, but bucket access may be restricted
+          if (bucketError.message.includes('PERMISSION_DENIED') || bucketError.message.includes('does not have')) {
+            result.warnings.push('Storage API enabled but bucket access denied. Check service account permissions.');
+          } else if (bucketError.message.includes('not exist')) {
+            result.warnings.push(`Bucket "${settings.gcsBucketName}" does not exist. Create it in Google Cloud Console.`);
+          } else {
+            result.warnings.push(`Bucket access: ${bucketError.message}`);
+          }
+        }
+      } else {
+        result.warnings.push('GCS bucket name not configured');
+      }
+    } catch (storageError) {
+      result.errors.push(`Storage API: ${storageError.message}`);
+      if (storageError.message.includes('API not enabled') || storageError.message.includes('not enabled')) {
+        result.warnings.push('Cloud Storage API may not be enabled. Enable it in Google Cloud Console.');
+      }
+    }
+    
+    // Check billing status (try to make a simple API call that requires billing)
+    // Note: This is a best-effort check, as billing API requires special permissions
+    try {
+      // Try to use a premium voice feature that requires billing
+      if (result.ttsApiEnabled) {
+        const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+        const ttsClient = new TextToSpeechClient({
+          keyFilename: settings.googleCredentialsPath,
+        });
+        
+        // Try to list Chirp 3 HD voices (premium, requires billing)
+        try {
+          const [premiumResult] = await ttsClient.listVoices({ languageCode: 'en-US' });
+          const hasPremiumVoices = premiumResult.voices?.some(v => 
+            v.name?.includes('Chirp3-HD') || v.name?.includes('Studio')
+          );
+          
+          if (hasPremiumVoices) {
+            result.billingEnabled = true;
+          } else {
+            // If we can list voices but no premium voices, billing might not be enabled
+            result.billingEnabled = false;
+            result.warnings.push('Premium voices (Chirp 3 HD, Studio) not available. Billing may not be enabled.');
+          }
+        } catch (billingError) {
+          // If we get a billing-related error, billing is likely not enabled
+          if (billingError.message.includes('billing') || billingError.message.includes('quota') || 
+              billingError.message.includes('PERMISSION_DENIED')) {
+            result.billingEnabled = false;
+            result.warnings.push('Billing may not be enabled. Enable billing in Google Cloud Console to use premium features.');
+          }
+        }
+      }
+    } catch (billingCheckError) {
+      // Billing check failed, but that's okay
+      result.warnings.push('Could not verify billing status. Ensure billing is enabled for premium features.');
+    }
+    
+    // Determine overall success
+    result.success = result.ttsApiEnabled && result.storageApiEnabled && result.errors.length === 0;
     
     // Restore original env
     Object.keys(originalEnv).forEach(key => {
@@ -178,17 +278,11 @@ async function testConnection(settings) {
       }
     });
     
-    return {
-      success: true,
-      projectId: credentials.project_id,
-      voicesAvailable: result.voices.length,
-    };
+    return result;
   } catch (err) {
     console.error('Connection test failed:', err);
-    return {
-      success: false,
-      error: err.message,
-    };
+    result.errors.push(err.message);
+    return result;
   }
 }
 

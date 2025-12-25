@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Modal from './Modal';
 import './Settings.css';
 
 const API_BASE_URL = '/api';
@@ -322,6 +323,11 @@ function Settings() {
   const [importingCreds, setImportingCreds] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [testingConnection, setTestingConnection] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showTestResultsModal, setShowTestResultsModal] = useState(false);
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+  const [testResults, setTestResults] = useState(null);
+  const [passwordInput, setPasswordInput] = useState('');
 
   useEffect(() => {
     loadSettings();
@@ -343,9 +349,14 @@ function Settings() {
     }
   };
 
+  const handleSaveClick = () => {
+    setShowSaveConfirmModal(true);
+  };
+
   const saveSettings = async () => {
     try {
       setSaving(true);
+      setShowSaveConfirmModal(false);
       setMessage({ type: '', text: '' });
 
       const response = await fetch(`${API_BASE_URL}/settings`, {
@@ -369,27 +380,53 @@ function Settings() {
     }
   };
 
+  // Mask credentials path for display (but keep actual value in state)
+  const maskCredentialsPath = (path) => {
+    if (!path) return '';
+    // If it's Omar's default path, mask it completely
+    if (path.includes('omarscreds') || path.includes('ettomar') || path.includes('/app/data/')) {
+      return '••••••••/google_credentials.json';
+    }
+    // Otherwise show only first and last parts
+    const parts = path.split('/');
+    if (parts.length <= 2) return path;
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    return `${first}/.../${last}`;
+  };
+  
+  // Get display value for credentials path
+  const getCredentialsDisplayValue = () => {
+    return maskCredentialsPath(settings.googleCredentialsPath);
+  };
+
+  const handleImportClick = () => {
+    setPasswordInput('');
+    setShowPasswordModal(true);
+  };
+
   const importOmarsCreds = async () => {
-    const password = prompt('Enter password to import Omar\'s credentials:');
-    if (!password) {
+    if (!passwordInput) {
       return;
     }
     
     try {
       setImportingCreds(true);
+      setShowPasswordModal(false);
       setMessage({ type: '', text: '' });
 
       const response = await fetch(`${API_BASE_URL}/settings/import-omars-creds`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password: passwordInput }),
       });
 
       if (response.ok) {
         const data = await response.json();
+        // Imported creds are automatically masked in display
         setSettings(data.settings);
-        setMessage({ type: 'success', text: 'Omar\'s credentials imported successfully!' });
-        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+        setMessage({ type: 'success', text: 'Omar\'s credentials imported successfully! Credentials path is hidden for security.' });
+        setTimeout(() => setMessage({ type: '', text: '' }), 5000);
       } else {
         const error = await response.json();
         setMessage({ type: 'error', text: error.error || 'Failed to import credentials' });
@@ -399,6 +436,7 @@ function Settings() {
       setMessage({ type: 'error', text: 'Failed to import credentials: ' + err.message });
     } finally {
       setImportingCreds(false);
+      setPasswordInput('');
     }
   };
 
@@ -414,14 +452,12 @@ function Settings() {
       });
 
       const result = await response.json();
-      if (response.ok && result.success) {
-        setMessage({ type: 'success', text: `✓ Connection successful! Project: ${result.projectId}` });
-      } else {
-        setMessage({ type: 'error', text: result.error || 'Connection test failed' });
-      }
+      setTestResults(result);
+      setShowTestResultsModal(true);
     } catch (err) {
       console.error('Connection test failed:', err);
-      setMessage({ type: 'error', text: 'Connection test failed: ' + err.message });
+      setTestResults({ success: false, error: 'Connection test failed: ' + err.message });
+      setShowTestResultsModal(true);
     } finally {
       setTestingConnection(false);
     }
@@ -623,9 +659,23 @@ function Settings() {
                 type="text"
                 id="googleCredentialsPath"
                 name="googleCredentialsPath"
-                value={settings.googleCredentialsPath}
-                onChange={handleChange}
+                value={getCredentialsDisplayValue()}
+                onChange={(e) => {
+                  // Only allow editing if it's not a masked path
+                  const currentDisplay = getCredentialsDisplayValue();
+                  if (currentDisplay.includes('••••••••')) {
+                    // Don't allow editing masked paths
+                    return;
+                  }
+                  // Allow normal editing
+                  handleChange(e);
+                }}
                 placeholder="/path/to/google_credentials.json"
+                style={{ 
+                  opacity: settings.googleCredentialsPath && getCredentialsDisplayValue().includes('••••••••') ? 0.7 : 1,
+                  fontFamily: getCredentialsDisplayValue().includes('••••••••') ? 'monospace' : 'inherit'
+                }}
+                readOnly={getCredentialsDisplayValue().includes('••••••••')}
               />
               <button type="button" className="browse-btn" onClick={handleFileSelect}>
                 Browse...
@@ -712,7 +762,7 @@ function Settings() {
       <div className="settings-actions">
         <button
           className="reset-btn"
-          onClick={importOmarsCreds}
+          onClick={handleImportClick}
           disabled={importingCreds}
         >
           {importingCreds ? 'Importing...' : (
@@ -743,7 +793,7 @@ function Settings() {
         </button>
         <button
           className="save-btn"
-          onClick={saveSettings}
+          onClick={handleSaveClick}
           disabled={saving}
         >
           {saving ? 'Saving...' : (
@@ -796,6 +846,237 @@ function Settings() {
           </li>
         </ol>
       </div>
+
+      {/* Password Modal for Import Creds */}
+      <Modal
+        isOpen={showPasswordModal}
+        onClose={() => {
+          setShowPasswordModal(false);
+          setPasswordInput('');
+        }}
+        title="Import Omar's Credentials"
+        size="small"
+      >
+        <div>
+          <p style={{ marginBottom: '16px', color: '#5C4033' }}>
+            Enter password to import Omar's default Google Cloud credentials:
+          </p>
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            placeholder="Enter password"
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: '8px',
+              border: '1px solid rgba(139, 69, 19, 0.3)',
+              fontSize: '16px',
+              marginBottom: '16px',
+            }}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                importOmarsCreds();
+              }
+            }}
+            autoFocus
+          />
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => {
+                setShowPasswordModal(false);
+                setPasswordInput('');
+              }}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid rgba(139, 69, 19, 0.3)',
+                background: 'transparent',
+                color: '#8B4513',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={importOmarsCreds}
+              disabled={!passwordInput || importingCreds}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#8B4513',
+                color: 'white',
+                cursor: passwordInput && !importingCreds ? 'pointer' : 'not-allowed',
+                opacity: passwordInput && !importingCreds ? 1 : 0.6,
+              }}
+            >
+              {importingCreds ? 'Importing...' : 'Import'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Test Connection Results Modal */}
+      <Modal
+        isOpen={showTestResultsModal}
+        onClose={() => setShowTestResultsModal(false)}
+        title="Connection Test Results"
+        size="large"
+      >
+        {testResults && (
+          <div>
+            {testResults.success ? (
+              <div className="modal-message success">
+                <strong>✓ Connection Successful!</strong>
+              </div>
+            ) : (
+              <div className="modal-message error">
+                <strong>✗ Connection Failed</strong>
+                {testResults.error && <div style={{ marginTop: '8px' }}>{testResults.error}</div>}
+              </div>
+            )}
+            
+            <div className="modal-details">
+              <h4>Test Details</h4>
+              <div className="detail-item">
+                <span className="detail-label">Project ID:</span>
+                <span className="detail-value">{testResults.projectId || 'N/A'}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">TTS API:</span>
+                <span className="detail-value">
+                  {testResults.ttsApiEnabled ? (
+                    <span className="status-badge success">✓ Enabled</span>
+                  ) : (
+                    <span className="status-badge error">✗ Not Enabled</span>
+                  )}
+                </span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Storage API:</span>
+                <span className="detail-value">
+                  {testResults.storageApiEnabled ? (
+                    <span className="status-badge success">✓ Enabled</span>
+                  ) : (
+                    <span className="status-badge error">✗ Not Enabled</span>
+                  )}
+                </span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Billing Status:</span>
+                <span className="detail-value">
+                  {testResults.billingEnabled === true ? (
+                    <span className="status-badge success">✓ Enabled</span>
+                  ) : testResults.billingEnabled === false ? (
+                    <span className="status-badge error">✗ Not Enabled</span>
+                  ) : (
+                    <span className="status-badge warning">⚠ Unknown</span>
+                  )}
+                </span>
+              </div>
+              {testResults.voicesAvailable && (
+                <div className="detail-item">
+                  <span className="detail-label">Voices Available:</span>
+                  <span className="detail-value">{testResults.voicesAvailable}</span>
+                </div>
+              )}
+              {testResults.bucketAccessible !== undefined && (
+                <div className="detail-item">
+                  <span className="detail-label">Bucket Access:</span>
+                  <span className="detail-value">
+                    {testResults.bucketAccessible ? (
+                      <span className="status-badge success">✓ Accessible</span>
+                    ) : (
+                      <span className="status-badge error">✗ Not Accessible</span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {testResults.warnings && testResults.warnings.length > 0 && (
+                <div style={{ marginTop: '16px' }}>
+                  <h4 style={{ color: '#ca8a04', marginBottom: '8px' }}>⚠️ Warnings:</h4>
+                  <ul>
+                    {testResults.warnings.map((warning, idx) => (
+                      <li key={idx} style={{ color: '#ca8a04' }}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {testResults.errors && testResults.errors.length > 0 && (
+                <div style={{ marginTop: '16px' }}>
+                  <h4 style={{ color: '#dc2626', marginBottom: '8px' }}>❌ Errors:</h4>
+                  <ul>
+                    {testResults.errors.map((error, idx) => (
+                      <li key={idx} style={{ color: '#dc2626' }}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowTestResultsModal(false)}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#8B4513',
+                  color: 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Save Settings Confirmation Modal */}
+      <Modal
+        isOpen={showSaveConfirmModal}
+        onClose={() => setShowSaveConfirmModal(false)}
+        title="Confirm Save Settings"
+        size="small"
+      >
+        <div>
+          <p style={{ marginBottom: '20px', color: '#5C4033' }}>
+            Are you sure you want to save these settings? This will update your Google Cloud configuration.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setShowSaveConfirmModal(false)}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid rgba(139, 69, 19, 0.3)',
+                background: 'transparent',
+                color: '#8B4513',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={saveSettings}
+              disabled={saving}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#8B4513',
+                color: 'white',
+                cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.6 : 1,
+              }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
