@@ -1,10 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Howl } from 'howler';
+import { getStoredFileHandle } from '../utils/fileHandles';
 import './AudioPlayer.css';
 
 const API_BASE_URL = '/api';
 
-function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
+// Helper functions
+const isLocalFS = (book) => Boolean(book?.isFileHandle || book?.storageMode === 'LOCAL_FS');
+const getHandleKey = (book) => book?.handleKey || book?.id;
+
+const guessFormat = (book) => {
+  // Blob URLs have no extension, so format matters for Howler
+  const ft = (book?.fileType || '').toLowerCase();
+  if (ft.includes('wav')) return ['wav'];
+  if (ft.includes('mpeg') || ft.includes('mp3')) return ['mp3'];
+  if (ft.includes('mp4') || ft.includes('m4a') || ft.includes('aac')) return ['m4a', 'aac'];
+  if (ft.includes('ogg')) return ['ogg'];
+  if (ft.includes('flac')) return ['flac'];
+  
+  // Fallback to filename extension
+  const name = (book?.filename || book?.uploadedFilename || '').toLowerCase();
+  if (name.endsWith('.wav')) return ['wav'];
+  if (name.endsWith('.mp3')) return ['mp3'];
+  if (name.endsWith('.m4a')) return ['m4a'];
+  if (name.endsWith('.aac')) return ['aac'];
+  if (name.endsWith('.ogg')) return ['ogg'];
+  if (name.endsWith('.flac')) return ['flac'];
+  
+  // Default fallback
+  return ['mp3', 'wav'];
+};
+
+function AudioPlayer({ selectedBook, bookTitle, bookId, onReset }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -17,19 +44,24 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
   const [bookmarkNote, setBookmarkNote] = useState('');
   const [showAddBookmark, setShowAddBookmark] = useState(false);
   const soundRef = useRef(null);
+  const blobUrlRef = useRef(null);
   const timeUpdateIntervalRef = useRef(null);
   const bookmarksSaveTimeoutRef = useRef(null);
+  
+  // Extract bookId and bookTitle from selectedBook if not provided directly
+  const finalBookId = bookId || selectedBook?.id;
+  const finalBookTitle = bookTitle || selectedBook?.bookTitle || 'Audiobook';
 
   // Load bookmarks from server
   useEffect(() => {
-    if (bookId) {
+    if (finalBookId) {
       loadBookmarksFromServer();
     }
-  }, [bookId]);
+  }, [finalBookId]);
 
   // Save bookmarks to server when they change (debounced)
   useEffect(() => {
-    if (bookId && bookmarks.length >= 0) {
+    if (finalBookId && bookmarks.length >= 0) {
       // Debounce saving to avoid too many requests
       if (bookmarksSaveTimeoutRef.current) {
         clearTimeout(bookmarksSaveTimeoutRef.current);
@@ -44,11 +76,13 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
         clearTimeout(bookmarksSaveTimeoutRef.current);
       }
     };
-  }, [bookmarks, bookId]);
+  }, [bookmarks, finalBookId]);
 
   const loadBookmarksFromServer = async () => {
+    if (!finalBookId) return;
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/bookmarks/${bookId}`);
+      const response = await fetch(`${API_BASE_URL}/bookmarks/${finalBookId}`);
       if (response.ok) {
         const data = await response.json();
         setBookmarks(data.bookmarks || []);
@@ -56,7 +90,7 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
     } catch (err) {
       console.error('Failed to load bookmarks from server:', err);
       // Fall back to localStorage
-      const localKey = `eyeear-bookmarks-${bookId}`;
+      const localKey = `eyeear-bookmarks-${finalBookId}`;
       const localBookmarks = localStorage.getItem(localKey);
       if (localBookmarks) {
         try {
@@ -69,10 +103,10 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
   };
 
   const saveBookmarksToServer = async () => {
-    if (!bookId) return;
+    if (!finalBookId) return;
     
     try {
-      await fetch(`${API_BASE_URL}/bookmarks/${bookId}`, {
+      await fetch(`${API_BASE_URL}/bookmarks/${finalBookId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookmarks }),
@@ -80,112 +114,221 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
     } catch (err) {
       console.error('Failed to save bookmarks to server:', err);
       // Fall back to localStorage
-      const localKey = `eyeear-bookmarks-${bookId}`;
+      const localKey = `eyeear-bookmarks-${finalBookId}`;
       localStorage.setItem(localKey, JSON.stringify(bookmarks));
     }
   };
 
+  // Main audio loading effect - resolves source internally
   useEffect(() => {
-    if (!audioUrl) {
-      setIsLoading(false);
-      return;
-    }
+    let cancelled = false;
 
-    setIsLoading(true);
-    setLoadError(null);
-
-    // Clean up previous sound
-    if (soundRef.current) {
-      soundRef.current.unload();
-      soundRef.current = null;
-    }
-
-    // Validate URL - blob URLs should start with 'blob:', server URLs should start with 'http' or '/'
-    if (!audioUrl.startsWith('blob:') && !audioUrl.startsWith('http') && !audioUrl.startsWith('/')) {
-      console.error('Invalid audio URL:', audioUrl);
-      setLoadError('Invalid audio URL format');
-      setIsLoading(false);
-      return;
-    }
-
-    const sound = new Howl({
-      src: [audioUrl],
-      html5: true,
-      preload: true,
-      format: ['mp3', 'wav'], // Explicitly specify formats
-      xhr: {
-        method: 'GET',
-        headers: {},
-        withCredentials: false,
-      },
-      onload: () => {
-        // Audio loaded successfully
-        setDuration(sound.duration());
-        setIsLoading(false);
-      },
-      onloaderror: (id, error) => {
-        console.error('Audio load error:', error, 'URL:', audioUrl);
-        // Howler error codes: 0=unknown, 1=decode, 2=network, 3=decode, 4=network
-        let errorMsg = 'Failed to load audio file. ';
-        if (error === 2 || error === 4) {
-          errorMsg += 'Network error - please check if the file exists at the server.';
-        } else if (error === 1 || error === 3) {
-          errorMsg += 'Audio format error - file may be corrupted.';
-        } else {
-          errorMsg += `Error code: ${error}`;
-        }
-        setLoadError(errorMsg);
-        setIsLoading(false);
-      },
-      onplay: () => {
-        setIsPlaying(true);
-        // Start updating current time
-        timeUpdateIntervalRef.current = setInterval(() => {
-          setCurrentTime(sound.seek() || 0);
-        }, 100);
-      },
-      onpause: () => {
-        setIsPlaying(false);
-        if (timeUpdateIntervalRef.current) {
-          clearInterval(timeUpdateIntervalRef.current);
-        }
-      },
-      onend: () => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        if (timeUpdateIntervalRef.current) {
-          clearInterval(timeUpdateIntervalRef.current);
-        }
-      },
-      onstop: () => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        if (timeUpdateIntervalRef.current) {
-          clearInterval(timeUpdateIntervalRef.current);
-        }
-      },
-    });
-
-    soundRef.current = sound;
-    sound.volume(volume);
-    sound.rate(playbackRate);
-
-    return () => {
+    const cleanup = () => {
       if (soundRef.current) {
         soundRef.current.unload();
+        soundRef.current = null;
+      }
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
       }
       if (timeUpdateIntervalRef.current) {
         clearInterval(timeUpdateIntervalRef.current);
+        timeUpdateIntervalRef.current = null;
       }
     };
-  }, [audioUrl]);
 
+    const setup = async () => {
+      if (!selectedBook) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError(null);
+      cleanup();
+
+      try {
+        let src = null;
+        const isLocal = isLocalFS(selectedBook);
+
+        if (isLocal) {
+          // LOCAL_FS: Get handle from IndexedDB → request permission → create blob URL
+          const handleKey = getHandleKey(selectedBook);
+          const handle = await getStoredFileHandle(handleKey);
+
+          if (!handle) {
+            if (!cancelled) {
+              setLoadError('Local file handle missing. Please re-import / relink this book.');
+              setIsLoading(false);
+            }
+            return;
+          }
+
+          // Permission check (best practice for File System Access API)
+          if (handle.queryPermission && handle.requestPermission) {
+            const perm = await handle.queryPermission({ mode: 'read' });
+            if (perm !== 'granted') {
+              const req = await handle.requestPermission({ mode: 'read' });
+              if (req !== 'granted') {
+                if (!cancelled) {
+                  setLoadError('Permission denied. Please grant access to read the file.');
+                  setIsLoading(false);
+                }
+                return;
+              }
+            }
+          }
+
+          const file = await handle.getFile();
+          src = URL.createObjectURL(file);
+          blobUrlRef.current = src;
+        } else {
+          // Server-backed: Use audioUrl or construct server URL
+          src = selectedBook.audioUrl || `${API_BASE_URL}/history/${selectedBook.id}/file`;
+        }
+
+        // Debug logging
+        console.log('[AudioPlayer] src:', src, 'local:', isLocal, selectedBook);
+
+        if (!src || cancelled) {
+          if (!cancelled) {
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        // Validate URL format
+        if (!src.startsWith('blob:') && !src.startsWith('http') && !src.startsWith('/')) {
+          console.error('Invalid audio URL:', src);
+          if (!cancelled) {
+            setLoadError('Invalid audio URL format');
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        const sound = new Howl({
+          src: [src],
+          html5: true,
+          preload: true,
+          format: guessFormat(selectedBook),
+          xhr: {
+            method: 'GET',
+            headers: {},
+            withCredentials: false,
+          },
+          onload: () => {
+            if (!cancelled) {
+              setDuration(sound.duration());
+              setIsLoading(false);
+            }
+          },
+          onloaderror: (id, error) => {
+            console.error('[Howler] load error', { code: error, src, selectedBook });
+            if (!cancelled) {
+              // Better error messages distinguishing local vs server
+              let errorMsg = isLocal
+                ? `Failed to load local audio (Howler code ${error}).`
+                : `Failed to load server audio (Howler code ${error}).`;
+              
+              // Howler error codes: 0=unknown, 1=decode, 2=network, 3=decode, 4=network
+              if (error === 2 || error === 4) {
+                errorMsg += isLocal
+                  ? ' File may have been moved or deleted.'
+                  : ' Network error - please check if the file exists at the server.';
+              } else if (error === 1 || error === 3) {
+                errorMsg += ' Audio format error - file may be corrupted.';
+              }
+              
+              setLoadError(errorMsg);
+              setIsLoading(false);
+            }
+          },
+          onplayerror: (id, error) => {
+            console.error('[Howler] play error', { code: error, src, selectedBook });
+            if (!cancelled) {
+              setLoadError(
+                isLocal
+                  ? `Failed to play local audio (Howler code ${error}).`
+                  : `Failed to play server audio (Howler code ${error}).`
+              );
+            }
+          },
+          onplay: () => {
+            if (!cancelled) {
+              setIsPlaying(true);
+              // Start updating current time
+              timeUpdateIntervalRef.current = setInterval(() => {
+                if (soundRef.current && !cancelled) {
+                  setCurrentTime(soundRef.current.seek() || 0);
+                }
+              }, 100);
+            }
+          },
+          onpause: () => {
+            if (!cancelled) {
+              setIsPlaying(false);
+              if (timeUpdateIntervalRef.current) {
+                clearInterval(timeUpdateIntervalRef.current);
+                timeUpdateIntervalRef.current = null;
+              }
+            }
+          },
+          onend: () => {
+            if (!cancelled) {
+              setIsPlaying(false);
+              setCurrentTime(0);
+              if (timeUpdateIntervalRef.current) {
+                clearInterval(timeUpdateIntervalRef.current);
+                timeUpdateIntervalRef.current = null;
+              }
+            }
+          },
+          onstop: () => {
+            if (!cancelled) {
+              setIsPlaying(false);
+              setCurrentTime(0);
+              if (timeUpdateIntervalRef.current) {
+                clearInterval(timeUpdateIntervalRef.current);
+                timeUpdateIntervalRef.current = null;
+              }
+            }
+          },
+        });
+
+        if (!cancelled) {
+          soundRef.current = sound;
+          sound.volume(volume);
+          sound.rate(playbackRate);
+        } else {
+          sound.unload();
+        }
+      } catch (e) {
+        console.error('[AudioPlayer] setup error', e);
+        if (!cancelled) {
+          setLoadError(e?.message || String(e));
+          setIsLoading(false);
+        }
+      }
+    };
+
+    setup();
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [selectedBook]);
+
+  // Update playback rate when it changes (without recreating sound)
   useEffect(() => {
     if (soundRef.current) {
       soundRef.current.rate(playbackRate);
     }
   }, [playbackRate]);
 
+  // Update volume when it changes (without recreating sound)
   useEffect(() => {
     if (soundRef.current) {
       soundRef.current.volume(volume);
@@ -275,7 +418,7 @@ function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
   return (
     <div className="audio-player-container">
       <div className="audio-player-header">
-        <h2 className="book-title">{bookTitle || 'Audiobook'}</h2>
+        <h2 className="book-title">{finalBookTitle}</h2>
         {onReset && (
           <button className="reset-btn" onClick={onReset} title="Generate Another Book">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

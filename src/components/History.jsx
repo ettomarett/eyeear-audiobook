@@ -906,7 +906,7 @@ function History({ onSelectBook }) {
             Back to Library
           </button>
           <AudioPlayer 
-            audioUrl={selectedBook.audioUrl} 
+            selectedBook={selectedBook}
             bookTitle={selectedBook.bookTitle}
             bookId={selectedBook.id}
             onReset={() => setSelectedBook(null)}
