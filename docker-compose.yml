@@ -28,12 +28,14 @@ services:
       - "traefik.http.routers.eyeear.entrypoints=websecure"
       - "traefik.http.routers.eyeear.tls.certresolver=cf"
       - "traefik.http.routers.eyeear.priority=900"
+      - "traefik.http.routers.eyeear.service=eyeear"
       - "traefik.http.services.eyeear.loadbalancer.server.port=3003"
       # Health check router
       - "traefik.http.routers.eyeear-hz.rule=Host(`eyeear.clueleak.com`) && Path(`/api/health`)"
       - "traefik.http.routers.eyeear-hz.entrypoints=websecure"
       - "traefik.http.routers.eyeear-hz.tls.certresolver=cf"
       - "traefik.http.routers.eyeear-hz.priority=1000"
+      - "traefik.http.routers.eyeear-hz.service=eyeear-hz"
       - "traefik.http.services.eyeear-hz.loadbalancer.server.port=3003"
 
 volumes:
