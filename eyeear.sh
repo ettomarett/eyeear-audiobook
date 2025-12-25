@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Kill any existing processes on the ports
-fuser -k 3001/tcp 2>/dev/null
+fuser -k 3003/tcp 2>/dev/null
 fuser -k 5173/tcp 2>/dev/null
 pkill -f "electron.*eyeear" 2>/dev/null
 
@@ -20,7 +20,7 @@ cleanup() {
     kill $VITE_PID 2>/dev/null
     kill $BACKEND_PID 2>/dev/null
     kill $ELECTRON_PID 2>/dev/null
-    fuser -k 3001/tcp 2>/dev/null
+    fuser -k 3003/tcp 2>/dev/null
     fuser -k 5173/tcp 2>/dev/null
     exit 0
 }
@@ -55,7 +55,7 @@ done
 # Wait for backend to be ready
 echo "⏳ Waiting for backend..."
 for i in {1..30}; do
-    if curl -s http://localhost:3001/api/health > /dev/null 2>&1; then
+    if curl -s http://localhost:3003/api/health > /dev/null 2>&1; then
         echo "✅ Backend ready!"
         break
     fi

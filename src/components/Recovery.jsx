@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Recovery.css';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3003/api';
 
 // SVG Icons
 const CloudIcon = () => (

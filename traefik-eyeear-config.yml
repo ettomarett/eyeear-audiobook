@@ -1,0 +1,41 @@
+# EyeEar Traefik Configuration
+# Add this to /root/services/clueleak-traefik/dynamic.yml
+# 
+# IMPORTANT: This is an ADDITION to the existing file, not a replacement!
+# Add these sections to the existing http.routers and http.services sections
+
+# Add to http.routers section:
+    # --- EyeEar Audiobook ---
+    eyeear:
+      entryPoints: ["websecure"]
+      rule: "Host(`eyeear.clueleak.com`)"
+      service: eyeear-svc
+      tls: { certResolver: cf }
+      priority: 900
+
+    eyeear-hz:
+      entryPoints: ["websecure"]
+      rule: "Host(`eyeear.clueleak.com`) && Path(`/api/health`)"
+      service: eyeear-health-svc
+      tls: { certResolver: cf }
+      priority: 1000
+
+# Add to http.services section:
+    # --- EyeEar ---
+    eyeear-svc:
+      loadBalancer:
+        servers:
+          # Use Docker bridge IP (172.17.0.1) to access host from container
+          # Alternative: Use host.docker.internal if Traefik is configured with --add-host
+          - url: "http://172.17.0.1:3003"
+        healthCheck:
+          path: "/api/health"
+          interval: "30s"
+          timeout: "10s"
+          scheme: "http"
+
+    eyeear-health-svc:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:3003"
+

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ProcessingStatus.css';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3003/api';
 
 function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onComplete, onStatusUpdate, onExtractionComplete, extractionData, currentStep: parentCurrentStep }) {
   const [currentStep, setCurrentStep] = useState('idle'); // Start as 'idle' instead of 'extracting'
@@ -49,7 +49,7 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
       const fetchTextWithRetry = async (retries = 5, delay = 1000) => {
         for (let attempt = 1; attempt <= retries; attempt++) {
           try {
-            const res = await fetch(`http://localhost:3001/temp/${jobId}.txt`);
+            const res = await fetch(`http://localhost:3003/temp/${jobId}.txt`);
             if (!res.ok) {
               throw new Error(`Failed to fetch text: ${res.status}`);
             }
@@ -268,7 +268,7 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
 
             // Get the filename from status (backend provides it)
             let filename = status.filename || status.outputPath?.split('/').pop() || status.outputPath?.split('\\').pop() || `${jobId}.mp3`;
-            const audioUrl = `http://localhost:3001/audio/${filename}`;
+            const audioUrl = `http://localhost:3003/audio/${filename}`;
             
             // Wait a bit longer and verify file exists before calling onComplete
             setTimeout(async () => {
@@ -283,7 +283,7 @@ function ProcessingStatus({ apiBaseUrl, jobId, bookTitle, uploadedFilename, onCo
                   if (retryStatusResponse.ok) {
                     const retryStatus = await retryStatusResponse.json();
                     const correctFilename = retryStatus.filename || filename;
-                    const correctUrl = `http://localhost:3001/audio/${correctFilename}`;
+                    const correctUrl = `http://localhost:3003/audio/${correctFilename}`;
                     onComplete(correctUrl);
                   } else {
                     onComplete(audioUrl); // Fallback to original URL

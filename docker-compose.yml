@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  eyeear-backend:
+    image: eyeear-audiobook:latest
+    container_name: eyeear-backend
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      # Add other environment variables as needed
+      # - GCS_BUCKET_NAME=your-bucket-name
+    volumes:
+      # Persist data, output, and logs
+      - eyeear_data:/app/data
+      - eyeear_output:/app/output
+      - eyeear_logs:/app/logs
+      - eyeear_temp:/app/temp
+      # Mount Google credentials if needed
+      # - ~/.eyeear/google_credentials.json:/app/google_credentials.json:ro
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      # Main router
+      - "traefik.http.routers.eyeear.rule=Host(`eyeear.clueleak.com`)"
+      - "traefik.http.routers.eyeear.entrypoints=websecure"
+      - "traefik.http.routers.eyeear.tls.certresolver=cf"
+      - "traefik.http.routers.eyeear.priority=900"
+      - "traefik.http.services.eyeear.loadbalancer.server.port=3003"
+      # Health check router
+      - "traefik.http.routers.eyeear-hz.rule=Host(`eyeear.clueleak.com`) && Path(`/api/health`)"
+      - "traefik.http.routers.eyeear-hz.entrypoints=websecure"
+      - "traefik.http.routers.eyeear-hz.tls.certresolver=cf"
+      - "traefik.http.routers.eyeear-hz.priority=1000"
+      - "traefik.http.services.eyeear-hz.loadbalancer.server.port=3003"
+
+volumes:
+  eyeear_data:
+  eyeear_output:
+  eyeear_logs:
+  eyeear_temp:
+
+networks:
+  traefik:
+    external: true
+

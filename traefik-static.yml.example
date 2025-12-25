@@ -1,0 +1,46 @@
+# Traefik static configuration example
+# This shows how to configure Traefik to use the dynamic configuration
+# Add these settings to your main Traefik configuration file
+# (usually /etc/traefik/traefik.yml or /etc/traefik/traefik.yaml)
+
+# Entry points
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+
+# Certificate resolvers (Let's Encrypt)
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: your-email@example.com
+      storage: /etc/traefik/acme.json
+      httpChallenge:
+        entryPoint: web
+
+# Providers
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+    filename: eyeear.yml
+
+# API and dashboard (optional, for monitoring)
+api:
+  dashboard: true
+  insecure: false
+
+# Logging
+log:
+  level: INFO
+
+accessLog: {}
+

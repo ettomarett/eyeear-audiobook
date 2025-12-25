@@ -105,7 +105,7 @@ function waitForBackend(callback, maxAttempts = 30) {
 
   const checkBackend = () => {
     attempts++;
-    const req = http.get('http://localhost:3001/api/health', (res) => {
+    const req = http.get('http://localhost:3003/api/health', (res) => {
       if (res.statusCode === 200) {
         console.log('Backend is ready!');
         callback();

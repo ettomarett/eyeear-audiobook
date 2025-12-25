@@ -14,3 +14,11 @@ data/
 *.metadata.json
 .vscode/
 .idea/
+
+# VPS credentials and SSH keys
+cluecontabo
+vps_creds.txt
+*.pem
+*.key
+id_rsa*
+

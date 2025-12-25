@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AudioPlayer from './AudioPlayer';
 import './History.css';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3003/api';
 
 function History({ onSelectBook }) {
   const [history, setHistory] = useState([]);
@@ -114,7 +114,7 @@ function History({ onSelectBook }) {
   };
 
   const handleBookClick = (book) => {
-    const audioUrl = `http://localhost:3001/audio/${book.filename}`;
+    const audioUrl = `http://localhost:3003/audio/${book.filename}`;
     setSelectedBook({
       ...book,
       audioUrl,
@@ -175,7 +175,7 @@ function History({ onSelectBook }) {
   const handleDownload = async (book, e) => {
     e.stopPropagation();
     try {
-      const audioUrl = `http://localhost:3001/audio/${book.filename}`;
+      const audioUrl = `http://localhost:3003/audio/${book.filename}`;
       const response = await fetch(audioUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);

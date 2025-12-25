@@ -28,7 +28,7 @@ const settingsService = require('./services/settingsService');
 const jobTrackingService = require('./services/jobTrackingService');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3003;
 
 // Initialize settings on startup (applies saved settings to environment)
 settingsService.initializeSettings();
@@ -79,6 +79,21 @@ app.use('/output', express.static(outputDir)); // Keep for backward compatibilit
 
 // Serve temp files (for text extraction)
 app.use('/temp', express.static(tempDir));
+
+// Serve frontend static files (for production deployment)
+const frontendDir = path.join(__dirname, '../frontend');
+if (fs.existsSync(frontendDir)) {
+  app.use(express.static(frontendDir));
+  // SPA fallback - serve index.html for all non-API routes
+  app.get('*', (req, res, next) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api/') || req.path.startsWith('/audio/') || 
+        req.path.startsWith('/temp/') || req.path.startsWith('/output/')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDir, 'index.html'));
+  });
+}
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Howl } from 'howler';
 import './AudioPlayer.css';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3003/api';
 
 function AudioPlayer({ audioUrl, bookTitle, bookId, onReset }) {
   const [isPlaying, setIsPlaying] = useState(false);
