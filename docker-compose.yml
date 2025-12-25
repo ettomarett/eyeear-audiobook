@@ -11,13 +11,12 @@ services:
       # Add other environment variables as needed
       # - GCS_BUCKET_NAME=your-bucket-name
     volumes:
-      # Persist data, output, and logs
-      - eyeear_data:/app/data
-      - eyeear_output:/app/output
-      - eyeear_logs:/app/logs
-      - eyeear_temp:/app/temp
-      # Mount Google credentials if needed
-      # - ~/.eyeear/google_credentials.json:/app/google_credentials.json:ro
+      # Persist data, output, and logs (using bind mounts for easier access)
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+      # Google credentials are stored in ./data/google_credentials.json
     networks:
       - traefik-network
     labels:
@@ -38,11 +37,12 @@ services:
       - "traefik.http.routers.eyeear-hz.service=eyeear-hz"
       - "traefik.http.services.eyeear-hz.loadbalancer.server.port=3003"
 
-volumes:
-  eyeear_data:
-  eyeear_output:
-  eyeear_logs:
-  eyeear_temp:
+# Using bind mounts instead of named volumes for easier file access
+# volumes:
+#   eyeear_data:
+#   eyeear_output:
+#   eyeear_logs:
+#   eyeear_temp:
 
 networks:
   traefik-network:
