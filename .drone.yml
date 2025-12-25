@@ -8,8 +8,6 @@ steps:
     image: node:20-alpine
     commands:
       - npm ci
-    depends_on:
-      - clone
     when:
       event:
         - push
@@ -41,23 +39,6 @@ steps:
       event:
         - push
         - pull_request
-
-  - name: build-docker-image
-    image: docker:24-dind
-    privileged: true
-    environment:
-      DOCKER_HOST: tcp://localhost:2375
-    commands:
-      - apk add --no-cache docker-cli
-      - docker build -t eyeear-audiobook:latest .
-    depends_on:
-      - build-frontend
-    when:
-      event:
-        - push
-      branch:
-        - main
-        - master
 
   - name: deploy-to-server
     image: alpine/git:latest
@@ -126,7 +107,7 @@ steps:
         
         echo "✅ Deployment complete!"
     depends_on:
-      - build-docker-image
+      - build-frontend
     when:
       event:
         - push
