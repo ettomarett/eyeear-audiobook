@@ -8,6 +8,8 @@ steps:
     image: node:20-alpine
     commands:
       - npm ci
+    depends_on:
+      - clone
     when:
       event:
         - push
