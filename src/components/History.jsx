@@ -46,7 +46,10 @@ function History({ onSelectBook }) {
 
       const db = await new Promise((resolve, reject) => {
         const request = indexedDB.open('eyeear-file-handles', 1);
-        request.onerror = () => reject(request.error);
+        request.onerror = () => {
+          console.warn('IndexedDB open error:', request.error);
+          reject(request.error);
+        };
         request.onsuccess = () => resolve(request.result);
         request.onupgradeneeded = (event) => {
           const db = event.target.result;
@@ -56,17 +59,27 @@ function History({ onSelectBook }) {
         };
       });
 
+      if (!db) {
+        return false;
+      }
+
       const transaction = db.transaction(['handles'], 'readonly');
       const store = transaction.objectStore('handles');
       const request = store.get(bookId);
       
-      return new Promise((resolve) => {
-        request.onsuccess = () => resolve(!!request.result?.fileHandle);
-        request.onerror = () => resolve(false);
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => {
+          const result = request.result;
+          resolve(!!(result && result.fileHandle));
+        };
+        request.onerror = () => {
+          console.warn('IndexedDB get error:', request.error);
+          resolve(false); // Return false instead of rejecting
+        };
       });
     } catch (err) {
-      console.error('Error checking file handle:', err);
-      return false;
+      console.warn('Error checking file handle:', err);
+      return false; // Always return false on error, don't throw
     }
   };
 
@@ -80,13 +93,23 @@ function History({ onSelectBook }) {
       const data = await response.json();
       
       // For file handle imports, check if the handle exists in IndexedDB
+      // Wrap in try-catch to prevent IndexedDB errors from breaking the entire load
       const enrichedData = await Promise.all(data.map(async (book) => {
         if (book.isFileHandle) {
-          const handleExists = await checkFileHandleExists(book.id);
-          return {
-            ...book,
-            fileExists: handleExists, // Update fileExists based on IndexedDB check
-          };
+          try {
+            const handleExists = await checkFileHandleExists(book.id);
+            return {
+              ...book,
+              fileExists: handleExists, // Update fileExists based on IndexedDB check
+            };
+          } catch (err) {
+            // If IndexedDB check fails, assume file doesn't exist but don't break the load
+            console.warn(`Failed to check file handle for book ${book.id}:`, err);
+            return {
+              ...book,
+              fileExists: false, // Mark as missing if we can't check
+            };
+          }
         }
         return book;
       }));
@@ -95,7 +118,7 @@ function History({ onSelectBook }) {
       setError(null);
     } catch (err) {
       console.error('Error loading library:', err);
-      setError(err.message);
+      setError('Failed to load library. Please try again.');
     } finally {
       setLoading(false);
     }
