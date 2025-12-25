@@ -266,7 +266,7 @@ function History({ onSelectBook }) {
       return;
     }
 
-    // Fallback to regular file input (Electron or older browsers)
+    // Fallback to regular file input (Electron or browsers without File System Access API)
     const file = event.target.files?.[0];
     if (!file) {
       // Reset the input so the same file can be selected again
@@ -296,36 +296,68 @@ function History({ onSelectBook }) {
         filePath = file.webkitRelativePath || null;
       }
       
-      if (!filePath) {
-        // Fallback: try to construct a path or use the file name
-        // This won't work for local file access in browsers, but might work in Electron
-        throw new Error('Could not determine file path. Please ensure you are using the Electron desktop app or a modern browser that supports File System Access API.');
-      }
+      // If we have a real file path (Electron), use path-based import
+      if (filePath) {
+        console.log('Importing file with path (Electron):', filePath);
 
-      console.log('Importing file with path:', filePath);
+        const response = await fetch(`${API_BASE_URL}/history/import`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            filePath: filePath,
+            fileName: file.name
+          }),
+        });
 
-      const response = await fetch(`${API_BASE_URL}/history/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          filePath: filePath,
-          fileName: file.name // Also send the filename for reference
-        }),
-      });
+        const result = await response.json();
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        console.log('Import successful:', result);
-        loadHistory(); // Refresh the library
-        setError('');
+        if (response.ok && result.success) {
+          console.log('Import successful:', result);
+          loadHistory();
+          setError('');
+        } else {
+          throw new Error(result.error || 'Import failed');
+        }
       } else {
-        throw new Error(result.error || 'Import failed');
+        // No file path available - must upload to server (Firefox/Safari)
+        console.log('Uploading file to server (no local file access in this browser):', file.name);
+        
+        const formData = new FormData();
+        formData.append('audioFile', file);
+        formData.append('bookTitle', file.name.replace(/\.[^/.]+$/, ''));
+
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const progress = Math.round((e.loaded / e.total) * 100);
+            setImportProgress(progress);
+          }
+        });
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const response = JSON.parse(xhr.responseText);
+            console.log('Upload successful:', response);
+            loadHistory();
+            setError('');
+          } else {
+            const errorResponse = JSON.parse(xhr.responseText);
+            throw new Error(errorResponse.error || 'Upload failed');
+          }
+        };
+
+        xhr.onerror = () => {
+          throw new Error('Network error during upload');
+        };
+
+        xhr.open('POST', `${API_BASE_URL}/history/import-upload`);
+        xhr.send(formData);
       }
     } catch (err) {
       console.error('Error importing audiobook:', err);
       setError(err.message || 'Failed to import audiobook');
-    } finally {
       setImporting(false);
       setImportProgress(0);
     }
@@ -688,16 +720,29 @@ function History({ onSelectBook }) {
           />
           <button 
             onClick={async () => {
-              // Try File System Access API first if available
+              // Try File System Access API first if available (Chrome, Edge, Opera)
               if ('showOpenFilePicker' in window) {
                 await handleImportAudiobook({ target: { files: [] } });
               } else {
-                // Fallback to regular file input
-                document.getElementById('import-audiobook-input').click();
+                // Fallback: In Firefox/Safari, we can't access local files without uploading
+                // Show info and offer to upload
+                const shouldUpload = window.confirm(
+                  '⚠️ Browser Limitation\n\n' +
+                  'This browser (Firefox/Safari) cannot access local files directly.\n\n' +
+                  'Options:\n' +
+                  '• Use Chrome/Edge for local file access (no upload needed)\n' +
+                  '• Upload file to server (works in all browsers)\n\n' +
+                  'Click OK to upload the file to the server.'
+                );
+                if (shouldUpload) {
+                  document.getElementById('import-audiobook-input').click();
+                }
               }
             }}
             className="import-btn" 
-            title="Import local audiobook (uses File System Access API in modern browsers)"
+            title={('showOpenFilePicker' in window) 
+              ? "Import local audiobook (no upload - File System Access API)" 
+              : "Import audiobook (requires upload in Firefox/Safari)"}
             disabled={importing}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

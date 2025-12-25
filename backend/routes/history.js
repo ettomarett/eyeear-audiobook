@@ -121,6 +121,66 @@ router.delete('/', (req, res) => {
   }
 });
 
+// Import a local audio file via upload (for browsers without File System Access API)
+router.post('/import-upload', audioUpload.single('audioFile'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No audio file provided' });
+    }
+
+    const bookTitle = req.body.bookTitle || path.basename(req.file.originalname, path.extname(req.file.originalname));
+    const jobId = `import_upload_${Date.now()}`;
+
+    // Create metadata for the uploaded file
+    const entry = addToHistory({
+      jobId: jobId,
+      bookTitle: bookTitle,
+      filename: req.file.filename,
+      filePath: req.file.path,
+      characterCount: 0,
+      createdAt: new Date().toISOString(),
+      uploadedFilename: req.file.originalname,
+      isImported: true,
+      isLocalPath: false, // File is on server, not local path
+      isFileHandle: false, // Not a file handle import
+    });
+
+    // Create a metadata file for consistency
+    const metadataPath = path.join(outputDir, `${jobId}.metadata.json`);
+    const metadata = {
+      jobId: jobId,
+      filename: req.file.filename,
+      outputPath: req.file.path,
+      status: 'completed',
+      createdAt: new Date().toISOString(),
+      metadata: {
+        bookTitle: bookTitle,
+        uploadedFilename: req.file.originalname,
+        characterCount: 0,
+        isImported: true,
+        isLocalPath: false,
+        isFileHandle: false,
+      }
+    };
+    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+
+    console.log(`Imported audiobook via upload: ${bookTitle} (${req.file.filename})`);
+    
+    res.json({
+      success: true,
+      message: 'Audiobook uploaded and imported successfully',
+      entry: entry
+    });
+  } catch (error) {
+    console.error('Error importing audiobook via upload:', error);
+    // Clean up uploaded file if import failed
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Import a local audio file to the library by file path (no upload)
 router.post('/import', (req, res) => {
   try {
