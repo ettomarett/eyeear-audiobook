@@ -76,11 +76,7 @@ steps:
           $$DEPLOY_USER@$$DEPLOY_HOST:$$DEPLOY_PATH/build/dist/
         
         # Build image and deploy
-        ssh $$DEPLOY_USER@$$DEPLOY_HOST \
-          "cd $$DEPLOY_PATH/build && \
-           docker build -t eyeear-audiobook:latest . && \
-           cd $$DEPLOY_PATH && \
-           docker-compose down 2>/dev/null || true"
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH/build && docker build -t eyeear-audiobook:latest . && cd $$DEPLOY_PATH && docker-compose down 2>/dev/null || true"
         
         # Deploy docker-compose.yml
         echo "📦 Deploying docker-compose.yml..."
@@ -90,10 +86,7 @@ steps:
         
         # Start container
         echo "📦 Starting Docker container..."
-        ssh $$DEPLOY_USER@$$DEPLOY_HOST \
-          "cd $$DEPLOY_PATH && \
-           docker-compose up -d && \
-           docker-compose ps"
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && docker-compose up -d && docker-compose ps"
         
         # Wait for service to be ready
         echo "⏳ Waiting for backend to be ready..."
@@ -101,9 +94,7 @@ steps:
         
         # Health check
         echo "🏥 Running health check..."
-        ssh $$DEPLOY_USER@$$DEPLOY_HOST \
-          "docker exec eyeear-backend wget -q -O- http://localhost:3003/api/health || \
-           curl -f http://localhost:3003/api/health || exit 1"
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "docker exec eyeear-backend wget -q -O- http://localhost:3003/api/health || curl -f http://localhost:3003/api/health || exit 1"
         
         echo "✅ Deployment complete!"
     depends_on:
