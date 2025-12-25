@@ -12,6 +12,46 @@ This guide explains how to set up automated deployment to `eyeear.clueleak.com` 
    - Systemd available for service management
    - SSL certificates configured in Traefik (Let's Encrypt recommended)
 
+## Development Workflow
+
+**Important**: All code changes should be made in your local repository, committed, and pushed to git. Drone CI will automatically deploy changes to the VPS. **Do not make changes directly on the VPS** (except for emergency fixes or server-specific configurations).
+
+### Standard Workflow
+
+1. **Make changes locally**:
+   ```bash
+   # Edit files in your local repository
+   # Test locally if possible
+   ```
+
+2. **Commit and push**:
+   ```bash
+   git add .
+   git commit -m "Description of changes"
+   git push origin main
+   ```
+
+3. **Drone CI automatically**:
+   - Builds the frontend
+   - Tests the backend
+   - Deploys to the VPS
+   - Runs health checks
+
+4. **Verify deployment**:
+   - Check Drone CI pipeline status at `https://ci.clueleak.com`
+   - Visit `https://eyeear.clueleak.com` to verify changes
+
+### When to Make Changes on VPS
+
+Only make changes directly on the VPS for:
+- **Emergency hotfixes** (then immediately commit and push the fix)
+- **Server-specific configurations** (environment variables, Docker volumes, etc.)
+- **Debugging** (checking logs, container status, etc.)
+
+After making emergency changes on the VPS, always:
+1. Pull the changes to your local repository
+2. Commit and push them to maintain consistency
+
 ## Setup Steps
 
 ### 1. Configure Drone CI Secrets
