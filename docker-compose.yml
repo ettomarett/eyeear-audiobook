@@ -19,10 +19,10 @@ services:
       # Mount Google credentials if needed
       # - ~/.eyeear/google_credentials.json:/app/google_credentials.json:ro
     networks:
-      - traefik
+      - traefik-network
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik"
+      - "traefik.docker.network=traefik-network"
       # Main router
       - "traefik.http.routers.eyeear.rule=Host(`eyeear.clueleak.com`)"
       - "traefik.http.routers.eyeear.entrypoints=websecure"
@@ -43,6 +43,6 @@ volumes:
   eyeear_temp:
 
 networks:
-  traefik:
+  traefik-network:
     external: true
 
