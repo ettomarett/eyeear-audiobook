@@ -76,7 +76,12 @@ steps:
           $$DEPLOY_USER@$$DEPLOY_HOST:$$DEPLOY_PATH/build/dist/
         
         # Build image and deploy
-        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH/build && docker build -t eyeear-audiobook:latest . && cd $$DEPLOY_PATH && (docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true)"
+        echo "🔨 Building Docker image..."
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH/build && docker build -t eyeear-audiobook:latest ."
+        
+        # Stop existing container gracefully
+        echo "🛑 Stopping existing container..."
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && (docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true)"
         
         # Deploy docker-compose.yml
         echo "📦 Deploying docker-compose.yml..."
@@ -86,15 +91,48 @@ steps:
         
         # Start container (try docker compose v2 first, fallback to docker-compose v1)
         echo "📦 Starting Docker container..."
-        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && (docker compose up -d && docker compose ps) || (docker-compose up -d && docker-compose ps)"
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && (docker compose up -d || docker-compose up -d)"
+        
+        # Ensure container is running (restart if stopped or unhealthy)
+        echo "🔄 Ensuring container is running and healthy..."
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && (docker compose ps | grep -q 'Up' || docker compose up -d) || (docker-compose ps | grep -q 'Up' || docker-compose up -d)"
+        
+        # Show container status
+        echo "📊 Container status:"
+        ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && (docker compose ps || docker-compose ps)"
         
         # Wait for service to be ready
         echo "⏳ Waiting for backend to be ready..."
         sleep 10
         
-        # Health check
+        # Health check with retries
         echo "🏥 Running health check..."
-        ssh $$DEPLOY_USER@$$DEPLOY_HOST "docker exec eyeear-backend wget -q -O- http://localhost:3003/api/health || curl -f http://localhost:3003/api/health || exit 1"
+        for i in 1 2 3 4 5; do
+          if ssh $$DEPLOY_USER@$$DEPLOY_HOST "docker exec eyeear-backend wget -q -O- http://localhost:3003/api/health 2>/dev/null || docker exec eyeear-backend curl -f http://localhost:3003/api/health 2>/dev/null"; then
+            echo "✅ Health check passed!"
+            break
+          fi
+          if [ $$i -lt 5 ]; then
+            echo "⚠️  Health check failed, retrying ($$i/5)..."
+            sleep 5
+            # Try to restart container if health check fails
+            ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && (docker compose restart || docker-compose restart) || true"
+            sleep 5
+          else
+            echo "❌ Health check failed after 5 attempts"
+            ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && docker compose ps && docker logs eyeear-backend --tail 20"
+            exit 1
+          fi
+        done
+        
+        # Verify container is actually running
+        echo "🔍 Verifying container status..."
+        if ! ssh $$DEPLOY_USER@$$DEPLOY_HOST "docker ps --filter 'name=eyeear-backend' --format '{{.Status}}' | grep -q 'Up'"; then
+          echo "❌ Container is not running!"
+          ssh $$DEPLOY_USER@$$DEPLOY_HOST "cd $$DEPLOY_PATH && docker compose ps && docker logs eyeear-backend --tail 20"
+          exit 1
+        fi
+        echo "✅ Container is running and healthy"
         
         echo "✅ Deployment complete!"
     depends_on:
