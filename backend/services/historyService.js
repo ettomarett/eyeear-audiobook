@@ -126,10 +126,18 @@ function getHistory() {
         }
       }
       
-      // Check if file exists (for local path imports)
+      // Check if this is a file handle import (stored in browser's IndexedDB, not on server)
+      const isFileHandle = metadata.metadata.isFileHandle || entry.isFileHandle || false;
+      
+      // Check if file exists (only for local path imports, not file handle imports)
       const filePath = metadata.outputPath || entry.filePath;
       let fileExists = true;
-      if (filePath) {
+      if (isFileHandle) {
+        // File handle imports are stored in browser's IndexedDB, not on server
+        // We can't check their existence server-side, so we assume they exist
+        // The frontend will check IndexedDB for the actual file handle
+        fileExists = true;
+      } else if (filePath) {
         fileExists = fs.existsSync(filePath);
       } else if (entry.filename) {
         const defaultPath = path.join(outputDir, entry.filename);
@@ -146,6 +154,7 @@ function getHistory() {
         uploadedFilename: metadata.metadata.uploadedFilename || entry.uploadedFilename,
         isImported: metadata.metadata.isImported || entry.isImported || false,
         isLocalPath: metadata.metadata.isLocalPath || entry.isLocalPath || false,
+        isFileHandle: isFileHandle,
         fileExists: fileExists, // Add file existence status
       };
     }
@@ -161,8 +170,12 @@ function getHistory() {
     }
     
     // Check if file exists for entries without metadata
+    // Skip check for file handle imports (stored in browser's IndexedDB)
     let fileExists = true;
-    if (entry.filePath) {
+    if (entry.isFileHandle) {
+      // File handle imports are stored in browser's IndexedDB, not on server
+      fileExists = true; // Assume exists, frontend will check IndexedDB
+    } else if (entry.filePath) {
       fileExists = fs.existsSync(entry.filePath);
     } else if (entry.filename) {
       const defaultPath = path.join(outputDir, entry.filename);

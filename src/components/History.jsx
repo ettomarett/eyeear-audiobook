@@ -37,6 +37,39 @@ function History({ onSelectBook }) {
     };
   }, [selectedBook]);
 
+  // Check if file handle exists in IndexedDB
+  const checkFileHandleExists = async (bookId) => {
+    try {
+      if (!('indexedDB' in window)) {
+        return false;
+      }
+
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('eyeear-file-handles', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains('handles')) {
+            db.createObjectStore('handles', { keyPath: 'bookId' });
+          }
+        };
+      });
+
+      const transaction = db.transaction(['handles'], 'readonly');
+      const store = transaction.objectStore('handles');
+      const request = store.get(bookId);
+      
+      return new Promise((resolve) => {
+        request.onsuccess = () => resolve(!!request.result?.fileHandle);
+        request.onerror = () => resolve(false);
+      });
+    } catch (err) {
+      console.error('Error checking file handle:', err);
+      return false;
+    }
+  };
+
   const loadHistory = async () => {
     try {
       setLoading(true);
@@ -45,7 +78,20 @@ function History({ onSelectBook }) {
         throw new Error('Failed to load library');
       }
       const data = await response.json();
-      setHistory(data);
+      
+      // For file handle imports, check if the handle exists in IndexedDB
+      const enrichedData = await Promise.all(data.map(async (book) => {
+        if (book.isFileHandle) {
+          const handleExists = await checkFileHandleExists(book.id);
+          return {
+            ...book,
+            fileExists: handleExists, // Update fileExists based on IndexedDB check
+          };
+        }
+        return book;
+      }));
+      
+      setHistory(enrichedData);
       setError(null);
     } catch (err) {
       console.error('Error loading library:', err);
@@ -260,9 +306,14 @@ function History({ onSelectBook }) {
 
   const handleBookClick = async (book) => {
     // Check if this is a file handle import (stored in IndexedDB)
-    const fileHandle = await getFileHandle(book.id);
-    
-    if (fileHandle) {
+    if (book.isFileHandle) {
+      const fileHandle = await getFileHandle(book.id);
+      
+      if (!fileHandle) {
+        setError('File handle not found. You may need to re-import the file using the File System Access API.');
+        return;
+      }
+      
       // Use File System Access API to read the file
       try {
         // Cleanup previous blob URL if exists
@@ -282,12 +333,12 @@ function History({ onSelectBook }) {
         return;
       } catch (err) {
         console.error('Error reading file from handle:', err);
-        setError('Failed to access file. You may need to re-import the file.');
+        setError('Failed to access file. The file may have been moved or deleted. Please re-import the file.');
         return;
       }
     }
 
-    // Fallback to regular file path check
+    // Fallback to regular file path check (for server-side files)
     try {
       const response = await fetch(`${API_BASE_URL}/history/${book.id}/check-file`);
       const result = await response.json();
